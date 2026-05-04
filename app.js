@@ -1805,15 +1805,26 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btnSkipPlacement').addEventListener('click', () => showMap());
   document.getElementById('placementSubmit').addEventListener('click', placementSubmitAnswer);
   document.getElementById('placementAnswer').addEventListener('keydown', e => { if (e.key === 'Enter') placementSubmitAnswer(); });
+  function handlePlacementInput(b) {
+    buzzTap();
+    const k = b.dataset.key;
+    const inp = document.getElementById('placementAnswer');
+    if (!inp) return;
+    if (k === 'back') inp.value = inp.value.slice(0, -1);
+    else if (k === '-') inp.value = inp.value.startsWith('-') ? inp.value.slice(1) : '-' + inp.value;
+    else if (k === ',') { if (!inp.value.includes(',')) inp.value += ','; }
+    else inp.value += k;
+  }
   document.querySelectorAll('#placementKeypad button').forEach(b => {
+    let handled = false;
+    b.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      handled = true;
+      handlePlacementInput(b);
+    });
     b.addEventListener('click', () => {
-      buzzTap();
-      const k = b.dataset.key;
-      const inp = document.getElementById('placementAnswer');
-      if (k === 'back') inp.value = inp.value.slice(0, -1);
-      else if (k === '-') inp.value = inp.value.startsWith('-') ? inp.value.slice(1) : '-' + inp.value;
-      else if (k === ',') { if (!inp.value.includes(',')) inp.value += ','; }
-      else inp.value += k;
+      if (handled) { handled = false; return; }
+      handlePlacementInput(b);
     });
   });
 
@@ -1862,18 +1873,29 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btnStartDuel').addEventListener('click', startDuel);
   document.getElementById('duelSubmit').addEventListener('click', () => duelSubmit());
   document.getElementById('duelAnswer').addEventListener('keydown', e => { if (e.key === 'Enter') duelSubmit(); });
+  function handleDuelInput(b) {
+    buzzTap();
+    const k = b.dataset.key;
+    const inp = document.getElementById('duelAnswer');
+    if (!inp) return;
+    if (k === 'back') inp.value = inp.value.slice(0, -1);
+    else if (k === '-') {
+      if (inp.value.startsWith('-')) inp.value = inp.value.slice(1);
+      else inp.value = '-' + inp.value;
+    }
+    else if (k === ',') { if (!inp.value.includes(',')) inp.value += ','; }
+    else inp.value += k;
+  }
   document.querySelectorAll('#duelKeypad button').forEach(b => {
+    let handled = false;
+    b.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      handled = true;
+      handleDuelInput(b);
+    });
     b.addEventListener('click', () => {
-      buzzTap();
-      const k = b.dataset.key;
-      const inp = document.getElementById('duelAnswer');
-      if (k === 'back') inp.value = inp.value.slice(0, -1);
-      else if (k === '-') {
-        if (inp.value.startsWith('-')) inp.value = inp.value.slice(1);
-        else inp.value = '-' + inp.value;
-      }
-      else if (k === ',') { if (!inp.value.includes(',')) inp.value += ','; }
-      else inp.value += k;
+      if (handled) { handled = false; return; }
+      handleDuelInput(b);
     });
   });
   document.getElementById('duelQuit').addEventListener('click', () => {
@@ -1892,6 +1914,9 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btnTrophies').addEventListener('click', showTrophies);
   // Boutique
   document.getElementById('btnShop').addEventListener('click', showShop);
+
+  // Plein écran (force le mode immersif via Fullscreen API)
+  document.getElementById('btnFullscreen').addEventListener('click', toggleFullscreen);
 
   // Export / Import
   document.getElementById('btnExport').addEventListener('click', () => {
@@ -1921,29 +1946,35 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.key === 'Enter') submitAnswer();
   });
 
-  // Keypad
+  // Keypad — utilise pointerdown + preventDefault pour éviter le double-firing
+  // (sur Android Chrome, click est parfois doublé après touchend)
+  function handleKeypadInput(b) {
+    buzzTap();
+    const k = b.dataset.key;
+    const inp = b.closest('#placementKeypad')
+      ? document.getElementById('placementAnswer')
+      : document.getElementById('exAnswer');
+    if (!inp) return;
+    if (k === 'back') inp.value = inp.value.slice(0, -1);
+    else if (k === '-') {
+      if (inp.value.startsWith('-')) inp.value = inp.value.slice(1);
+      else inp.value = '-' + inp.value;
+    }
+    else if (k === ',') { if (!inp.value.includes(',')) inp.value += ','; }
+    else if (k === '/') { if (!inp.value.includes('/')) inp.value += '/'; }
+    else inp.value += k;
+  }
   document.querySelectorAll('.ex-keypad button').forEach(b => {
-    b.addEventListener('click', () => {
-      buzzTap();
-      const k = b.dataset.key;
-      // On utilise un sélecteur dynamique : si on est sur le keypad de l'exercice (#exKeypad)
-      // ou du placement (#placementKeypad). Détermine via le parent.
-      const inp = b.closest('#placementKeypad')
-        ? document.getElementById('placementAnswer')
-        : document.getElementById('exAnswer');
-      if (!inp) return;
-      if (k === 'back') inp.value = inp.value.slice(0, -1);
-      else if (k === '-') {
-        if (inp.value.startsWith('-')) inp.value = inp.value.slice(1);
-        else inp.value = '-' + inp.value;
-      }
-      else if (k === ',') {
-        if (!inp.value.includes(',')) inp.value += ',';
-      }
-      else if (k === '/') {
-        if (!inp.value.includes('/')) inp.value += '/';
-      }
-      else inp.value += k;
+    let handled = false;
+    b.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      handled = true;
+      handleKeypadInput(b);
+    });
+    b.addEventListener('click', (e) => {
+      // Si pointerdown a déjà géré, on ignore le click (qui peut suivre)
+      if (handled) { handled = false; return; }
+      handleKeypadInput(b);
     });
   });
 
@@ -3010,6 +3041,21 @@ function scheduleNotificationCheck() {
       } catch(e) {}
     });
   }, 30 * 60 * 1000);
+}
+
+/* ---------- Plein écran (Fullscreen API) ---------- */
+function toggleFullscreen() {
+  const doc = document;
+  const elem = document.documentElement;
+  const isFullscreen = !!(doc.fullscreenElement || doc.webkitFullscreenElement);
+  if (isFullscreen) {
+    if (doc.exitFullscreen) doc.exitFullscreen();
+    else if (doc.webkitExitFullscreen) doc.webkitExitFullscreen();
+  } else {
+    if (elem.requestFullscreen) elem.requestFullscreen({ navigationUI: 'hide' }).catch(()=>flash('Plein écran non supporté'));
+    else if (elem.webkitRequestFullscreen) elem.webkitRequestFullscreen();
+    else flash('Pour le plein écran, installe l\'app : Menu ⋮ → Installer l\'application');
+  }
 }
 
 function showConfirm(title, text, onYes) {
