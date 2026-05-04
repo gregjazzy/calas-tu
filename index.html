@@ -145,6 +145,18 @@
   <div id="parentDashboard"></div>
 </section>
 
+<!-- ============ ÉCRAN BOUTIQUE ============ -->
+<section id="screen-shop" class="screen">
+  <div class="bg-stars"></div>
+  <header class="topbar">
+    <button class="btn-back" data-target="screen-map">←</button>
+    <h2>🛍️ Boutique</h2>
+    <div class="coins-balance" id="coinsBalance">💰 0</div>
+  </header>
+  <div class="shop-intro" id="shopIntro"></div>
+  <div class="shop-grid" id="shopGrid"></div>
+</section>
+
 <!-- ============ ÉCRAN WRAPPED — bilan du mois ============ -->
 <section id="screen-wrapped" class="screen">
   <div class="bg-stars"></div>
@@ -278,6 +290,7 @@
         </div>
       </div>
     </div>
+    <button class="btn-icon" id="btnShop" title="Boutique">🛍️</button>
     <button class="btn-icon" id="btnExport" title="Sauvegarder">💾</button>
     <button class="btn-icon" id="btnTrophies" title="Trophées">🏆</button>
   </header>
@@ -362,6 +375,16 @@
         <span>Ton bilan à partager</span>
       </div>
     </button>
+  </div>
+
+  <!-- Tournoi familial (visible uniquement si plusieurs profils) -->
+  <div class="tournament-card" id="tournamentCard" style="display:none">
+    <div class="tournament-header">
+      <span>🏆 Tournoi de la semaine</span>
+      <span class="tournament-week" id="tournamentWeek"></span>
+    </div>
+    <div class="tournament-list" id="tournamentList"></div>
+    <div class="tournament-last" id="tournamentLast" style="display:none"></div>
   </div>
 
   <h3 class="section-title">🗺️ Les Mondes</h3>
@@ -545,6 +568,9 @@
   <button id="btnUpdate">Mettre à jour</button>
 </div>
 
+<!-- Indicateur hors ligne -->
+<div class="offline-indicator" id="offlineIndicator">📵 Hors ligne — la progression est sauvée localement</div>
+
 <script src="exercises.js"></script>
 <script src="app.js"></script>
 <script>
@@ -592,6 +618,16 @@ document.addEventListener('touchend', (e) => {
 
 // Empêche le pinch-zoom (sécurité — déjà bloqué par viewport)
 document.addEventListener('gesturestart', (e) => e.preventDefault());
+
+// Indicateur hors ligne
+function updateOfflineIndicator() {
+  const el = document.getElementById('offlineIndicator');
+  if (!el) return;
+  el.classList.toggle('show', !navigator.onLine);
+}
+window.addEventListener('online', updateOfflineIndicator);
+window.addEventListener('offline', updateOfflineIndicator);
+updateOfflineIndicator();
 
 // Détecte l'orientation paysage (smartphones uniquement, < 600px de largeur portrait)
 function checkOrientation() {

@@ -1593,6 +1593,66 @@ input { font-family: inherit; }
   color: var(--accent);
 }
 .parent-kid-stats .pkstat span { font-size: 10px; color: var(--text-soft); }
+/* Bilan astucieux (parent) */
+.trick-summary {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.trick-summary .ts {
+  background: rgba(0,0,0,0.3);
+  border-radius: 8px;
+  padding: 8px 4px;
+  text-align: center;
+}
+.trick-summary .ts b { display: block; font-size: 18px; font-weight: 900; }
+.trick-summary .ts span { font-size: 9px; color: var(--text-soft); }
+.trick-summary .ts-mastered b { color: var(--good); }
+.trick-summary .ts-good b { color: var(--accent); }
+.trick-summary .ts-learning b { color: #b794f4; }
+.trick-summary .ts-slow b { color: #ff8500; }
+.trick-summary .ts-failing b { color: var(--bad); }
+
+.trick-details summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--accent);
+  padding: 6px 0;
+  font-weight: 700;
+}
+.trick-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 6px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.trick-row:last-child { border: 0; }
+.trick-row .tr-icon { font-size: 18px; flex-shrink: 0; }
+.trick-row .tr-body { flex: 1; }
+.trick-row .tr-name {
+  font-weight: 700;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.trick-row .tr-speed {
+  font-size: 11px;
+  color: var(--text-soft);
+  font-weight: 400;
+}
+.trick-row .tr-advice {
+  font-size: 11px;
+  color: var(--text-soft);
+  margin-top: 2px;
+  line-height: 1.4;
+}
+.trick-row.trick-failing .tr-advice { color: var(--bad); }
+.trick-row.trick-slow .tr-advice { color: #ff8500; }
+.trick-row.trick-mastered .tr-advice { color: var(--good); opacity: 0.85; }
+
 .weak-list, .strong-list {
   font-size: 12px;
   margin-top: 8px;
@@ -1617,6 +1677,70 @@ input { font-family: inherit; }
 .heatmap-cell.lvl2 { background: rgba(6, 214, 160, 0.55); }
 .heatmap-cell.lvl3 { background: rgba(6, 214, 160, 0.85); }
 .heatmap-cell.lvl4 { background: var(--good); box-shadow: 0 0 6px var(--good); }
+
+/* ===== Boutique ===== */
+.coins-balance {
+  background: linear-gradient(135deg, #ffd166, #ff8500);
+  color: #1a0b3d;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-weight: 900;
+  font-size: 14px;
+  box-shadow: 0 4px 14px rgba(255, 209, 102, 0.3);
+}
+.shop-intro {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  font-size: 13px;
+  color: var(--text-soft);
+  position: relative; z-index: 1;
+}
+.shop-intro b { color: var(--accent); }
+.shop-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  position: relative; z-index: 1;
+}
+.shop-item {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px 10px;
+  text-align: center;
+  transition: transform 0.12s, background 0.12s;
+}
+.shop-item:active { transform: scale(0.97); }
+.shop-item .emoji { font-size: 40px; display: block; margin-bottom: 6px; }
+.shop-item .name { font-size: 12px; font-weight: 700; min-height: 32px; display: flex; align-items: center; justify-content: center; }
+.shop-item .price {
+  margin-top: 8px;
+  background: linear-gradient(135deg, #ffd166, #ff8500);
+  color: #1a0b3d;
+  padding: 4px 10px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 900;
+}
+.shop-item.owned { opacity: 0.55; }
+.shop-item.owned .price {
+  background: var(--good);
+  color: #fff;
+}
+.shop-item.equipped {
+  border-color: var(--accent);
+  box-shadow: 0 0 18px rgba(255, 209, 102, 0.35);
+}
+.shop-item.equipped .price {
+  background: var(--accent);
+}
+.shop-item.unaffordable .price {
+  opacity: 0.5;
+  filter: grayscale(0.6);
+}
 
 /* ===== Wrapped (bilan partageable) ===== */
 .wrapped-card {
@@ -1805,6 +1929,79 @@ input { font-family: inherit; }
   border-radius: 10px;
   font-weight: 800;
   font-size: 12px;
+}
+
+/* ===== Tournoi familial ===== */
+.tournament-card {
+  background: linear-gradient(135deg, rgba(255, 209, 102, 0.18), rgba(247, 37, 133, 0.15));
+  border: 1px solid rgba(255, 209, 102, 0.35);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 18px;
+  position: relative; z-index: 1;
+}
+.tournament-header {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 14px; font-weight: 800;
+  margin-bottom: 12px;
+  color: var(--accent);
+}
+.tournament-week { font-size: 11px; color: var(--text-soft); font-weight: 600; }
+.tournament-list { display: flex; flex-direction: column; gap: 6px; }
+.tournament-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: rgba(0,0,0,0.25);
+  font-size: 13px;
+}
+.tournament-row.current {
+  border: 1px solid var(--accent);
+  background: rgba(255, 209, 102, 0.18);
+}
+.tournament-row .tr-rank { font-weight: 900; min-width: 22px; }
+.tournament-row .tr-av { font-size: 22px; }
+.tournament-row .tr-name { flex: 1; font-weight: 700; }
+.tournament-row .tr-xp {
+  background: linear-gradient(135deg, #ffd166, #ff8500);
+  color: #1a0b3d;
+  padding: 2px 10px;
+  border-radius: 10px;
+  font-weight: 800;
+  font-size: 12px;
+}
+.tournament-last {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255,255,255,0.1);
+  font-size: 12px;
+  color: var(--text-soft);
+  text-align: center;
+}
+.tournament-last b { color: var(--accent); }
+
+/* ===== Indicateur hors ligne ===== */
+.offline-indicator {
+  display: none;
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0,0,0,0.9);
+  color: var(--accent);
+  padding: 10px 16px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+  z-index: 400;
+  border: 1px solid rgba(255, 209, 102, 0.4);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+  animation: slideUpOffline 0.3s ease;
+}
+.offline-indicator.show { display: block; }
+@keyframes slideUpOffline {
+  from { transform: translate(-50%, 30px); opacity: 0; }
+  to { transform: translate(-50%, 0); opacity: 1; }
 }
 
 /* ===== Mode "clavier OS ouvert" ===== */

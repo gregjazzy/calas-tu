@@ -74,6 +74,73 @@ function newProfile(name, avatar, classe) {
    Intervalles entre révisions : box 1 = 1 jour, 2 = 3j, 3 = 7j, 4 = 14j, 5 = 30j */
 const LEITNER_DAYS = { 1: 1, 2: 3, 3: 7, 4: 14, 5: 30 };
 
+/* ============================================================
+   TOURNOI HEBDOMADAIRE — classement entre profils sur les 7 derniers jours
+   ============================================================ */
+
+function weekKey(d = new Date()) {
+  // ISO week (lundi-dimanche). On fait simple : YYYY-Wnn
+  const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const dayNum = (date.getUTCDay() + 6) % 7;
+  date.setUTCDate(date.getUTCDate() - dayNum + 3);
+  const firstThursday = new Date(Date.UTC(date.getUTCFullYear(), 0, 4));
+  const week = 1 + Math.round(((date - firstThursday) / 86400000 - 3 + ((firstThursday.getUTCDay() + 6) % 7)) / 7);
+  return `${date.getUTCFullYear()}-W${String(week).padStart(2, '0')}`;
+}
+
+function weeklyXPFor(profile) {
+  // Somme des XP des 7 derniers jours
+  const today = new Date();
+  let total = 0;
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(today); d.setDate(d.getDate() - i);
+    const key = d.toISOString().slice(0, 10);
+    const a = (profile.activity || {})[key];
+    if (a) total += a.xp || 0;
+  }
+  return total;
+}
+
+function tournamentRanking() {
+  return state.data.profiles
+    .map(p => ({ profile: p, weekly: weeklyXPFor(p) }))
+    .sort((a, b) => b.weekly - a.weekly);
+}
+
+/* Enregistre le titre "Champion de la semaine" en début de nouvelle semaine */
+function checkWeeklyChampion() {
+  if (state.data.profiles.length < 2) return;
+  const currentWeek = weekKey();
+  const lastChecked = state.data.lastWeekChampionCheck;
+  if (lastChecked === currentWeek) return; // déjà fait cette semaine
+  // Si une semaine précédente vient de se finir, on archive le champion
+  state.data.lastWeekChampionCheck = currentWeek;
+  state.data.weeklyChampions = state.data.weeklyChampions || [];
+  // Calcule sur la semaine PRÉCÉDENTE
+  const lastWeek = new Date();
+  lastWeek.setDate(lastWeek.getDate() - 7);
+  const prev = state.data.profiles.map(p => {
+    let total = 0;
+    for (let i = 7; i < 14; i++) {
+      const d = new Date(); d.setDate(d.getDate() - i);
+      const key = d.toISOString().slice(0, 10);
+      const a = (p.activity || {})[key];
+      if (a) total += a.xp || 0;
+    }
+    return { id: p.id, name: p.name, xp: total };
+  }).filter(x => x.xp > 0)
+    .sort((a, b) => b.xp - a.xp);
+  if (prev.length > 0 && prev[0].xp >= 50) { // au moins 50 XP pour être champion
+    state.data.weeklyChampions.unshift({
+      week: weekKey(lastWeek),
+      champion: prev[0],
+      podium: prev.slice(0, 3),
+    });
+    if (state.data.weeklyChampions.length > 8) state.data.weeklyChampions.length = 8;
+    saveData();
+  }
+}
+
 /* Enregistre l'activité du jour (pour heatmap parent + wrapped) */
 function recordActivity(profile, exos, correct, xp, seconds) {
   const today = new Date().toISOString().slice(0, 10);
@@ -589,6 +656,7 @@ function renderProfiles() {
         <span>${p.classe} · Niveau ${lvl} · ${p.xp} XP</span>
       </div>
       <button class="del" data-act="export" data-id="${p.id}" title="Sauvegarder">💾</button>
+      <button class="del" data-act="reset" data-id="${p.id}" title="Recommencer à zéro" style="margin-left:6px">🔄</button>
       <button class="del" data-act="del" data-id="${p.id}" title="Supprimer" style="margin-left:6px">🗑</button>
     `;
     item.addEventListener('click', (e) => {
@@ -596,6 +664,16 @@ function renderProfiles() {
       if (btn) {
         if (btn.dataset.act === 'export') {
           openExportModal(p);
+        } else if (btn.dataset.act === 'reset') {
+          if (confirm(`Recommencer le profil de ${p.name} à zéro ?\n\n⚠️ Toute sa progression sera perdue. Le prénom, l'avatar et la classe sont conservés.\n\nPense à sauvegarder avant (bouton 💾) si tu veux pouvoir restaurer.`)) {
+            const fresh = newProfile(p.name, p.avatar, p.classe);
+            fresh.id = p.id;
+            const idx = state.data.profiles.findIndex(x => x.id === p.id);
+            if (idx >= 0) state.data.profiles[idx] = fresh;
+            saveData();
+            renderProfiles();
+            flash(`${p.name} : tout remis à zéro !`);
+          }
         } else if (btn.dataset.act === 'del') {
           if (confirm(`Supprimer le profil de ${p.name} ?\n\n⚠️ Pense à le sauvegarder avant (bouton 💾) si tu veux le récupérer plus tard.`)) {
             state.data.profiles = state.data.profiles.filter(x => x.id !== p.id);
@@ -616,6 +694,7 @@ function selectProfile(id) {
   if (!state.current) return;
   state.data.lastProfile = id;
   saveData();
+  applyTheme(state.current);
   showMap();
 }
 
@@ -704,6 +783,49 @@ function showMap() {
 
   // Coach : bouton "Continuer" + plan du jour + verrouillage
   renderCoach(p, blocked, urgent);
+
+  // Tournoi familial
+  renderTournament(p);
+}
+
+function renderTournament(currentP) {
+  const card = document.getElementById('tournamentCard');
+  if (!card) return;
+  if (state.data.profiles.length < 2) {
+    card.style.display = 'none';
+    return;
+  }
+  // Détection nouveau champion en début de semaine
+  checkWeeklyChampion();
+
+  card.style.display = '';
+  document.getElementById('tournamentWeek').textContent = '7 derniers jours';
+
+  const ranking = tournamentRanking();
+  const list = document.getElementById('tournamentList');
+  list.innerHTML = '';
+  ranking.forEach((r, i) => {
+    const medals = ['🥇', '🥈', '🥉'];
+    const row = document.createElement('div');
+    row.className = 'tournament-row' + (r.profile.id === currentP.id ? ' current' : '');
+    row.innerHTML = `
+      <div class="tr-rank">${medals[i] || (i+1+'.')}</div>
+      <div class="tr-av">${r.profile.avatar}</div>
+      <div class="tr-name">${escapeHTML(r.profile.name)}</div>
+      <div class="tr-xp">${r.weekly} XP</div>
+    `;
+    list.appendChild(row);
+  });
+
+  // Champion de la semaine précédente
+  const lastChampion = (state.data.weeklyChampions || [])[0];
+  const lastEl = document.getElementById('tournamentLast');
+  if (lastChampion) {
+    lastEl.style.display = '';
+    lastEl.innerHTML = `🏆 Champion de la semaine ${lastChampion.week} : <b>${escapeHTML(lastChampion.champion.name)}</b> (${lastChampion.champion.xp} XP)`;
+  } else {
+    lastEl.style.display = 'none';
+  }
 }
 
 function renderCoach(p, blocked, urgent) {
@@ -1768,6 +1890,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Trophées
   document.getElementById('btnTrophies').addEventListener('click', showTrophies);
+  // Boutique
+  document.getElementById('btnShop').addEventListener('click', showShop);
 
   // Export / Import
   document.getElementById('btnExport').addEventListener('click', () => {
@@ -2429,6 +2553,37 @@ function showParentDashboard() {
         ${strong.length > 0 ? `<div class="strong-list">✅ <b>Bien acquis :</b> ${strong.map(k => prettyDrillKey(k)).join(', ')}</div>` : ''}
       </div>
     `;
+
+    // Bilan astucieux détaillé
+    const report = trickReport(p);
+    if (report.length > 0) {
+      html += `<div class="parent-section trick-report">
+        <h3>🎯 Bilan astucieux — ${escapeHTML(p.name)}</h3>
+        <p style="font-size:12px;color:var(--text-soft);margin-bottom:12px">
+          Ce qui compte : pas seulement la justesse, mais si l'astuce est <b>utilisée</b> (vitesse).
+        </p>`;
+      const counts = { mastered: 0, good: 0, learning: 0, slow: 0, failing: 0 };
+      report.forEach(r => counts[r.level]++);
+      html += `<div class="trick-summary">
+        <div class="ts ts-mastered" title="Astuces automatiques"><b>${counts.mastered}</b><span>💎 réflexe</span></div>
+        <div class="ts ts-good" title="En automatisation"><b>${counts.good}</b><span>⚡ bon</span></div>
+        <div class="ts ts-learning" title="En apprentissage"><b>${counts.learning}</b><span>🌱 j'apprends</span></div>
+        <div class="ts ts-slow" title="Sait mais sans astuce"><b>${counts.slow}</b><span>🐢 lent</span></div>
+        <div class="ts ts-failing" title="Mal compris"><b>${counts.failing}</b><span>❌ rate</span></div>
+      </div>`;
+      html += `<details class="trick-details"><summary>Détail astuce par astuce</summary>`;
+      report.forEach(r => {
+        const speed = r.avgTime != null ? `<span class="tr-speed">~${r.avgTime.toFixed(1)}s</span>` : '';
+        html += `<div class="trick-row trick-${r.level}">
+          <span class="tr-icon">${r.status}</span>
+          <div class="tr-body">
+            <div class="tr-name">${prettyDrillKey(r.key)} ${speed}</div>
+            <div class="tr-advice">${r.advice}</div>
+          </div>
+        </div>`;
+      });
+      html += `</details></div>`;
+    }
   });
 
   // Comparaison rapide
@@ -2466,6 +2621,49 @@ function showParentDashboard() {
   updateNotifStatus();
 }
 
+/* Construit le bilan astucieux d'un enfant : pour chaque astuce,
+   donne son statut d'apprentissage et une recommandation parentale */
+function trickReport(profile) {
+  const skills = profile.skills || {};
+  const lines = [];
+  Object.entries(skills).forEach(([key, s]) => {
+    if (s.seen < 3) return; // pas assez de data
+    const masteredRatio = (s.mastered || 0) / s.seen;
+    const errorRatio = s.errors / s.seen;
+    const slowRatio = (s.slow || 0) / s.seen;
+    let status, level, advice;
+    if (masteredRatio >= 0.7 && s.box >= 4) {
+      status = '💎'; level = 'mastered';
+      advice = 'Astuce automatique. Continue les révisions espacées.';
+    } else if (masteredRatio >= 0.4) {
+      status = '⚡'; level = 'good';
+      advice = 'En cours d\'automatisation. Quelques drills pour finir le travail.';
+    } else if (errorRatio < 0.2 && slowRatio > 0.4) {
+      status = '🐢'; level = 'slow';
+      advice = '⚠️ Sait calculer mais sans utiliser l\'astuce. Drill prioritaire.';
+    } else if (errorRatio > 0.4) {
+      status = '❌'; level = 'failing';
+      advice = '🚨 Astuce mal comprise. Refaire la leçon avant tout.';
+    } else {
+      status = '🌱'; level = 'learning';
+      advice = 'En apprentissage. Continue régulièrement.';
+    }
+    lines.push({
+      key, status, level, advice,
+      seen: s.seen,
+      avgTime: s.avgTime,
+      bestTime: s.bestTime,
+      masteredRatio,
+      errorRatio,
+      slowRatio,
+    });
+  });
+  // Trie : failing/slow d'abord (à travailler), puis learning, puis good, puis mastered
+  const order = { failing: 0, slow: 1, learning: 2, good: 3, mastered: 4 };
+  lines.sort((a, b) => order[a.level] - order[b.level]);
+  return lines;
+}
+
 function prettyDrillKey(k) {
   const map = {
     x10: '×10/100', x10dec: 'décimaux', div10: '÷10', x01: '×0,1', div01: '÷0,1',
@@ -2479,6 +2677,147 @@ function prettyDrillKey(k) {
   };
   return map[k] || k;
 }
+
+/* ============================================================
+   BOUTIQUE — accessoires achetables avec des pièces 💰
+   Conversion : 10 XP = 1 pièce
+   ============================================================ */
+
+function coinsFor(profile) {
+  // Pièces = (XP total) / 10 - dépenses cumulées
+  const earned = Math.floor((profile.xp || 0) / 10);
+  const spent = profile.coinsSpent || 0;
+  return earned - spent;
+}
+
+function ownedShopItems(profile) {
+  return profile.shop || [];
+}
+
+function isOwned(profile, itemId) {
+  return ownedShopItems(profile).includes(itemId);
+}
+
+function equippedItem(profile, type) {
+  const eq = profile.shopEquipped || {};
+  return eq[type] || null;
+}
+
+function buyShopItem(profile, item) {
+  if (isOwned(profile, item.id)) return false;
+  const balance = coinsFor(profile);
+  if (balance < item.cost) return false;
+  profile.coinsSpent = (profile.coinsSpent || 0) + item.cost;
+  profile.shop = profile.shop || [];
+  profile.shop.push(item.id);
+  // Auto-équipement à l'achat
+  profile.shopEquipped = profile.shopEquipped || {};
+  profile.shopEquipped[item.type] = item.id;
+  saveData();
+  return true;
+}
+
+function equipShopItem(profile, item) {
+  if (!isOwned(profile, item.id)) return false;
+  profile.shopEquipped = profile.shopEquipped || {};
+  if (profile.shopEquipped[item.type] === item.id) {
+    delete profile.shopEquipped[item.type]; // re-clic = déséquiper
+  } else {
+    profile.shopEquipped[item.type] = item.id;
+  }
+  // Si c'est un thème, applique-le immédiatement
+  if (item.type === 'theme') applyTheme(profile);
+  saveData();
+  return true;
+}
+
+function applyTheme(profile) {
+  const themeId = equippedItem(profile, 'theme');
+  if (themeId && SHOP_THEMES[themeId]) {
+    document.body.style.background = SHOP_THEMES[themeId].bg;
+    document.body.style.backgroundAttachment = 'fixed';
+    document.documentElement.style.setProperty('--accent', SHOP_THEMES[themeId].accent);
+  } else {
+    document.body.style.background = '';
+    document.documentElement.style.removeProperty('--accent');
+  }
+}
+
+function showShop() {
+  const p = state.current;
+  if (!p) return;
+  document.getElementById('coinsBalance').textContent = `💰 ${coinsFor(p)}`;
+  const intro = document.getElementById('shopIntro');
+  intro.innerHTML = `
+    Convertis ton XP en pièces 💰 et achète des accessoires, thèmes et stickers !<br>
+    <b>10 XP = 1 pièce</b>. Tu as <b>${coinsFor(p)} 💰</b> à dépenser.
+  `;
+  const grid = document.getElementById('shopGrid');
+  grid.innerHTML = '';
+  // Grouper par type
+  const types = { hat: '🎩 Chapeaux', access: '🎀 Accessoires', sticker: '✨ Stickers', theme: '🎨 Thèmes' };
+  Object.entries(types).forEach(([type, label]) => {
+    const items = SHOP_ITEMS.filter(i => i.type === type);
+    const header = document.createElement('div');
+    header.style.cssText = 'grid-column:1/-1;font-size:14px;font-weight:800;color:var(--accent);margin:8px 0 4px';
+    header.textContent = label;
+    grid.appendChild(header);
+    items.forEach(item => {
+      const owned = isOwned(p, item.id);
+      const equipped = equippedItem(p, item.type) === item.id;
+      const balance = coinsFor(p);
+      const affordable = balance >= item.cost;
+      const card = document.createElement('div');
+      card.className = 'shop-item' + (owned ? ' owned' : '') + (equipped ? ' equipped' : '') + (!owned && !affordable ? ' unaffordable' : '');
+      card.innerHTML = `
+        <span class="emoji">${item.emoji}</span>
+        <div class="name">${escapeHTML(item.name)}</div>
+        <div class="price">${owned ? (equipped ? '✓ Équipé' : 'Cliquer') : '💰 ' + item.cost}</div>
+      `;
+      card.onclick = () => {
+        if (owned) {
+          equipShopItem(p, item);
+          buzzTap();
+          showShop(); // refresh
+          flash(equipped ? `${item.name} : retiré` : `${item.name} : équipé !`);
+        } else {
+          if (balance < item.cost) {
+            flash(`Il te manque ${item.cost - balance} 💰`);
+            return;
+          }
+          if (confirm(`Acheter ${item.name} pour ${item.cost} 💰 ?\n\nIl te restera ${balance - item.cost} 💰.`)) {
+            buyShopItem(p, item);
+            sndLevel(); confetti(20); buzzTrophy();
+            showShop();
+            flash(`${item.name} acheté !`);
+          }
+        }
+      };
+      grid.appendChild(card);
+    });
+  });
+  showScreen('screen-shop');
+}
+
+/* Étend avatarHTML pour afficher l'item équipé en plus de l'accessoire de niveau */
+const _origAvatarHTML = avatarHTML;
+avatarHTML = function(profile) {
+  const lvl = levelFor(profile.xp).level;
+  const acc = accessoryFor(lvl);
+  const equippedHat = equippedItem(profile, 'hat');
+  const equippedAccess = equippedItem(profile, 'access');
+  const equippedSticker = equippedItem(profile, 'sticker');
+  const hatItem = SHOP_ITEMS.find(i => i.id === equippedHat);
+  const accessItem = SHOP_ITEMS.find(i => i.id === equippedAccess);
+  const stickerItem = SHOP_ITEMS.find(i => i.id === equippedSticker);
+  let html = `<span class="av-with-acc">${profile.avatar}`;
+  if (acc.emoji) html += `<span class="acc">${acc.emoji}</span>`;
+  if (hatItem) html += `<span class="acc" style="top:-8px;right:auto;left:-4px">${hatItem.emoji}</span>`;
+  if (accessItem) html += `<span class="acc" style="bottom:-2px;right:-12px">${accessItem.emoji}</span>`;
+  if (stickerItem) html += `<span class="acc" style="top:0;left:50%;transform:translateX(-50%) translateY(-10px)">${stickerItem.emoji}</span>`;
+  html += `</span>`;
+  return html;
+};
 
 /* ============================================================
    WRAPPED — bilan du mois
@@ -2611,26 +2950,65 @@ function enableNotifications() {
   });
 }
 
+/* Choisit une "astuce oubliée" pour rappel personnalisé */
+function pickForgottenSkill(profile) {
+  const skills = profile.skills || {};
+  const candidates = Object.entries(skills)
+    .filter(([k, s]) => {
+      if (s.seen < 5) return false;
+      // Vue il y a au moins 5 jours
+      const days = (Date.now() - (s.lastSeen || 0)) / 86400000;
+      if (days < 5) return false;
+      // Et qui était bien acquise (box >= 3)
+      return (s.box || 1) >= 3;
+    })
+    .sort((a, b) => a[1].lastSeen - b[1].lastSeen);
+  return candidates.length > 0 ? candidates[0][0] : null;
+}
+
+function trickRecallMessage(drillKey) {
+  const examples = {
+    x9: 'Tu te souviens du truc des ×9 ? Essaye 47 × 9 !',
+    x11: 'Le truc des ×11 te dit quelque chose ? Tente 35 × 11 !',
+    x25_50: '×25 = ×100÷4. Toujours dans tes réflexes ?',
+    x5: '×5 = ×10÷2 — viens vérifier que c\'est toujours automatique !',
+    compl100: 'Compléments à 100 : 47 + ? Tu sais ?',
+    x01: 'Multiplier par 0,1 c\'est diviser par... viens revoir !',
+    carre5: 'Le truc des carrés en 5 (35², 75²...) t\'attend !',
+    fracSimplify: 'Simplification de fractions : à reprendre avant l\'oubli !',
+  };
+  return examples[drillKey] || 'Une astuce s\'efface — viens la rafraîchir !';
+}
+
 let notifCheckInterval = null;
 function scheduleNotificationCheck() {
   if (notifCheckInterval) return;
-  // Vérifie toutes les 30 min si on est près de 17h et l'enfant n'a pas joué aujourd'hui
   notifCheckInterval = setInterval(() => {
     const now = new Date();
-    if (now.getHours() === 17 && now.getMinutes() < 30 && Notification.permission === 'granted') {
-      const today = now.toISOString().slice(0, 10);
-      state.data.profiles.forEach(p => {
-        if (p.lastPlayDay !== today) {
-          try {
-            new Notification(`Calastu — ${p.name}`, {
-              body: `Tu as un streak de ${p.dayStreak||0} jour${(p.dayStreak||0)>1?'s':''} 🔥 — viens jouer pour le garder !`,
-              icon: 'icon-192.png',
-              tag: `calastu-${p.id}-${today}`,
-            });
-          } catch(e) {}
-        }
-      });
-    }
+    if (now.getHours() !== 17 || now.getMinutes() >= 30) return;
+    if (Notification.permission !== 'granted') return;
+    const today = now.toISOString().slice(0, 10);
+    state.data.profiles.forEach(p => {
+      if (p.lastPlayDay === today) return;
+      // Choix du message : si une astuce est oubliée, on la cible. Sinon streak.
+      const forgotten = pickForgottenSkill(p);
+      let body;
+      if (forgotten) {
+        body = trickRecallMessage(forgotten);
+      } else if ((p.dayStreak || 0) >= 2) {
+        body = `Tu as un streak de ${p.dayStreak} jour${p.dayStreak>1?'s':''} 🔥 — viens jouer pour le garder !`;
+      } else {
+        const due = dueSkills(p).length;
+        if (due > 0) body = `${due} astuce${due>1?'s':''} à réviser t\'attend${due>1?'ent':''} 🎯`;
+        else body = 'C\'est l\'heure de ton entraînement quotidien ! 🧠';
+      }
+      try {
+        new Notification(`Calastu — ${p.name}`, {
+          body, icon: 'icon-192.png',
+          tag: `calastu-${p.id}-${today}`,
+        });
+      } catch(e) {}
+    });
   }, 30 * 60 * 1000);
 }
 

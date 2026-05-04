@@ -1437,6 +1437,37 @@ function nextAccessory(level) {
   return null;
 }
 
+/* ===== Boutique : items achetables avec des pièces 💰 ===== */
+const SHOP_ITEMS = [
+  { id: 'hat_party',   emoji: '🎉', name: 'Chapeau de fête',     cost: 50,  type: 'hat' },
+  { id: 'hat_crown',   emoji: '👑', name: 'Couronne dorée',      cost: 200, type: 'hat' },
+  { id: 'hat_cap',     emoji: '🧢', name: 'Casquette swag',      cost: 80,  type: 'hat' },
+  { id: 'hat_wizard',  emoji: '🧙', name: 'Chapeau de magicien', cost: 150, type: 'hat' },
+  { id: 'hat_cowboy',  emoji: '🤠', name: 'Chapeau cowboy',      cost: 100, type: 'hat' },
+  { id: 'access_glasses',emoji: '🕶️', name: 'Lunettes de soleil', cost: 60, type: 'access' },
+  { id: 'access_medal',  emoji: '🥇', name: 'Médaille d\'or',      cost: 120, type: 'access' },
+  { id: 'access_scarf',  emoji: '🧣', name: 'Écharpe d\'hiver',    cost: 40,  type: 'access' },
+  { id: 'access_book',   emoji: '📚', name: 'Livre du sage',       cost: 90,  type: 'access' },
+  { id: 'access_rocket', emoji: '🚀', name: 'Fusée',                cost: 180, type: 'access' },
+  { id: 'theme_galaxy',  emoji: '🌌', name: 'Thème Galaxie',         cost: 250, type: 'theme' },
+  { id: 'theme_forest',  emoji: '🌲', name: 'Thème Forêt',           cost: 150, type: 'theme' },
+  { id: 'theme_fire',    emoji: '🔥', name: 'Thème Feu',             cost: 200, type: 'theme' },
+  { id: 'theme_ocean',   emoji: '🌊', name: 'Thème Océan',           cost: 150, type: 'theme' },
+  { id: 'sticker_star',  emoji: '⭐', name: 'Étoile brillante',      cost: 70,  type: 'sticker' },
+  { id: 'sticker_heart', emoji: '💖', name: 'Cœur diamant',          cost: 80,  type: 'sticker' },
+  { id: 'sticker_lightning',emoji: '⚡', name: 'Foudre',                cost: 60, type: 'sticker' },
+  { id: 'sticker_diamond', emoji: '💎', name: 'Diamant pur',           cost: 220, type: 'sticker' },
+];
+
+const SHOP_THEMES = {
+  theme_galaxy: { bg: 'linear-gradient(180deg, #0d0033 0%, #1a0066 50%, #4d00b3 100%)', accent: '#9d4edd' },
+  theme_forest: { bg: 'linear-gradient(180deg, #0a2e1a 0%, #145533 50%, #2d8a52 100%)', accent: '#7bc97b' },
+  theme_fire:   { bg: 'linear-gradient(180deg, #2e0a0a 0%, #771414 50%, #ff4d00 100%)', accent: '#ffae00' },
+  theme_ocean:  { bg: 'linear-gradient(180deg, #001a33 0%, #003d77 50%, #0077b3 100%)', accent: '#4cc9f0' },
+};
+
+window.SHOP_ITEMS = SHOP_ITEMS;
+window.SHOP_THEMES = SHOP_THEMES;
 window.AVATAR_ACCESSORIES = AVATAR_ACCESSORIES;
 window.accessoryFor = accessoryFor;
 window.nextAccessory = nextAccessory;
