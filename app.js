@@ -1202,7 +1202,7 @@ function startExercise(opts) {
 
 function nextQuestion() {
   const s = state.session;
-  if (!s) return;
+  if (!s || s._finished) return;
 
   // Fin de session ?
   if (s.count >= s.total && s.mode !== 'survival' && s.mode !== 'chrono' && s.mode !== 'worldchrono') {
@@ -1211,6 +1211,12 @@ function nextQuestion() {
   }
   // Chrono global : on s'arrête si le temps est écoulé
   if ((s.mode === 'chrono' || s.mode === 'worldchrono') && s.globalChronoLeft <= 0) {
+    finishSession();
+    return;
+  }
+  // Garde-fou : si on dépasse le total de plus de 1 (cas pathologique), on stoppe
+  if (typeof s.total === 'number' && isFinite(s.total) && s.count > s.total) {
+    console.warn('Session count exceeds total — forcing finish');
     finishSession();
     return;
   }
@@ -1346,6 +1352,8 @@ function formatQuestion(q) {
 function submitAnswer(timeout = false) {
   const s = state.session;
   if (!s || !s.currentEx) return;
+  if (s._submitting) return; // empêche la double soumission (clic + entrée)
+  s._submitting = true;
   if (s.timer) { clearTimeout(s.timer); s.timer = null; }
 
   const userInput = document.getElementById('exAnswer').value;
@@ -1510,16 +1518,17 @@ function showFeedback(good, ex, userInput, timeout = false) {
     document.getElementById('feedbackExpl').innerHTML = coachLine + ex.explanation;
   }
 
-  // En chrono : on n'attend pas le clic, on enchaîne après 1.2s
+  // En chrono : on n'attend pas le clic, on enchaîne après 800ms
   if (isChrono && good) {
     fb.classList.add('show');
     document.getElementById('btnNext').style.display = 'none';
     setTimeout(() => {
       document.getElementById('btnNext').style.display = '';
-      if (fb.classList.contains('show')) nextAfterFeedback();
+      const cur = state.session;
+      // Garde-fou : ne déclenche que si la session est toujours active ET non finie
+      if (cur && !cur._finished && fb.classList.contains('show')) nextAfterFeedback();
     }, 800);
   } else if (isChrono && !good) {
-    // En cas d'erreur en chrono : on prend le temps d'expliquer (apprentissage prime)
     document.getElementById('btnNext').style.display = '';
     fb.classList.add('show');
   } else {
@@ -1529,21 +1538,23 @@ function showFeedback(good, ex, userInput, timeout = false) {
 }
 
 function nextAfterFeedback() {
-  const s = state.session;
   document.getElementById('feedback').classList.remove('show');
-
+  const s = state.session;
+  if (!s || s._finished) return; // session terminée → on ne fait plus rien
+  // Libère le verrou de soumission pour la prochaine question
+  s._submitting = false;
   // Mode survie : si 0 vie, fin
   if (s.mode === 'survival' && s.lives <= 0) {
     finishSession();
     return;
   }
-
   nextQuestion();
 }
 
 function finishSession() {
   const s = state.session;
-  if (!s) return;
+  if (!s || s._finished) return;
+  s._finished = true; // empêche les doubles appels
   if (s.timer) { clearTimeout(s.timer); s.timer = null; }
   if (s.globalTimer) { clearInterval(s.globalTimer); s.globalTimer = null; }
   document.getElementById('feedback').classList.remove('show');
@@ -1747,6 +1758,9 @@ function finishSession() {
   };
 
   showScreen('screen-results');
+  // Coup de grâce : on libère la session pour qu'aucun événement résiduel
+  // (timer, double-tap, hash de Suivant) ne puisse relancer un cycle.
+  state.session = null;
 }
 
 /* ============================================================
