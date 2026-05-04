@@ -1076,6 +1076,79 @@ const WORLDS = [
     ]
   },
 
+  /* ---- MONDE 11 : FRACTIONS ASTUCIEUSES ---- */
+  {
+    id: 'frac',
+    name: 'Fractions Astucieuses',
+    emoji: '🍕',
+    color: '#ff8500',
+    description: "Le terrain de jeu favori des matheux : simplifier AVANT de calculer. Le truc qui fait gagner 30 secondes par calcul.",
+    lesson: `
+      <h3>🍕 Fractions Astucieuses</h3>
+      <p>Avec les fractions, l'astuce maître est : <strong>simplifier AVANT de calculer</strong>.</p>
+
+      <h4>📌 Diviseur commun express</h4>
+      <p>Pour simplifier <code>a/b</code>, cherche le plus grand nombre qui divise <b>les deux</b>.</p>
+      <div class="ex">48/36 → 12 divise les deux → 4/3</div>
+      <div class="tip">Astuces de divisibilité :<br>
+        • Par 2 : si pair<br>
+        • Par 3 : si la somme des chiffres est divisible par 3<br>
+        • Par 5 : si finit par 0 ou 5<br>
+        • Par 9 : somme des chiffres divisible par 9
+      </div>
+
+      <h4>🪄 Simplification en croix (le truc magique)</h4>
+      <p>Quand tu as <code>(a × b) / (c × d)</code>, tu peux simplifier <strong>en croix</strong> avant de multiplier.</p>
+      <div class="ex"><b>(35 × 24) / (14 × 18)</b><br>
+        35 et 14 → ÷ 7 → 5 et 2<br>
+        24 et 18 → ÷ 6 → 4 et 3<br>
+        Reste : (5 × 4) / (2 × 3) = 20/6 = <b>10/3</b></div>
+
+      <h4>💡 Fraction d'un nombre — diviser d'abord !</h4>
+      <p>Pour <code>3/4 × 28</code>, ne fais PAS 3 × 28 puis ÷ 4. Trop dur !</p>
+      <div class="ex"><b>3/4 × 28</b> → 28 ÷ 4 = 7 → 7 × 3 = <b>21</b></div>
+
+      <h4>💯 Pourcentages = fractions</h4>
+      <ul>
+        <li>50% = 1/2 (la moitié)</li>
+        <li>25% = 1/4 (le quart)</li>
+        <li>75% = 3/4 (les trois quarts)</li>
+        <li>20% = 1/5</li>
+        <li>10% = 1/10</li>
+        <li>12,5% = 1/8</li>
+      </ul>
+      <div class="ex">75% de 80 → 80 × 3/4 → 80÷4 = 20 → ×3 = <b>60</b></div>
+
+      <h4>🔁 Diviser par une fraction = multiplier par l'inverse</h4>
+      <div class="ex"><b>24 ÷ 3/4</b> → 24 × 4/3 = 96/3 = <b>32</b></div>
+
+      <h4>🎯 Le facteur caché</h4>
+      <p>Certaines fractions ont un facteur magique :</p>
+      <ul>
+        <li>125 × 8 = 1000 → <b>125/1000 = 1/8</b></li>
+        <li>250 × 4 = 1000 → <b>250/1000 = 1/4</b></li>
+        <li>625 = 5 × 125, 1000 = 8 × 125 → <b>625/1000 = 5/8</b></li>
+      </ul>
+
+      <h4>🚀 La règle d'or</h4>
+      <p>AVANT de multiplier ou d'additionner des fractions : <strong>SIMPLIFIE TOUJOURS</strong>. Tu auras des nombres 10× plus petits à manipuler.</p>
+
+      <h4>⌨️ Comment écrire ta réponse</h4>
+      <p>Pour répondre une fraction, utilise <code>/</code> entre le numérateur et le dénominateur. Exemple : <b>3/4</b>. Si le résultat est entier, tape juste le nombre.</p>
+    `,
+    stages: [
+      { name: 'Diviseur express', desc: 'Simplifier a/b', count: 12, gen: gen_frac_simplify, drillKey: 'fracSimplify' },
+      { name: 'Pourcentages malins', desc: '25%, 50%, 75% comme fractions', count: 12, gen: gen_frac_pct, drillKey: 'fracPct' },
+      { name: 'Fraction d\'un nombre', desc: 'Diviser d\'abord !', count: 12, gen: gen_frac_of_number, drillKey: 'fracOfN' },
+      { name: 'Diviser par une fraction', desc: 'L\'inverse magique', count: 12, gen: gen_frac_divide_by, drillKey: 'fracDivBy' },
+      { name: 'Facteur caché', desc: '125/1000, 75/100...', count: 12, gen: gen_frac_hidden_factor, drillKey: 'fracHidden' },
+      { name: 'Simplification en croix', desc: 'Le truc des pros', count: 12, gen: gen_frac_cross, drillKey: 'fracCross' },
+      { name: 'Associer pour 1', desc: 'Trios qui se simplifient', count: 10, gen: gen_frac_associate, drillKey: 'fracAssoc' },
+      { name: '⚡ Drill 50', desc: 'Simplifications express', count: 50, gen: gen_frac_simplify, drill: true },
+      { name: 'Marathon', desc: 'Toutes les astuces fraction', count: 12, gen: gen_frac_marathon },
+    ]
+  },
+
   /* ---- MONDE 10 : HISTOIRES (problèmes contextuels) ---- */
   {
     id: 'pb',
@@ -1301,6 +1374,14 @@ const TIME_THRESHOLDS = {
   carre5:     { fast: 4.0, ok: 8.0, label: 'Carré en 5' },
   carreSimple:{ fast: 7.0, ok: 14.0, label: 'Carré décomposé' },
   carre100:   { fast: 6.0, ok: 12.0, label: 'Carré près de 100' },
+  // Fractions (lecture + simplification, on est tolérants)
+  fracSimplify: { fast: 5.0, ok: 10.0, label: 'Diviseur commun' },
+  fracPct:      { fast: 5.0, ok: 10.0, label: 'Pourcentage = fraction' },
+  fracOfN:      { fast: 5.0, ok: 10.0, label: 'Fraction d\'un nombre' },
+  fracDivBy:    { fast: 6.0, ok: 12.0, label: 'Diviser par fraction' },
+  fracHidden:   { fast: 5.0, ok: 10.0, label: 'Facteur caché' },
+  fracCross:    { fast: 8.0, ok: 16.0, label: 'Simplification en croix' },
+  fracAssoc:    { fast: 8.0, ok: 16.0, label: 'Association' },
   // Problèmes (lecture lente, on est tolérants)
   pbAdd:      { fast: 7.0, ok: 14.0, label: 'Problème addition' },
   pbSub:      { fast: 7.0, ok: 14.0, label: 'Problème soustraction' },
@@ -1466,6 +1547,212 @@ function gen_pb_mix(level = 1) {
   return pick([gen_pb_chain, gen_pb_pct, gen_pb_div, gen_pb_mult])();
 }
 
+/* ============================================================
+   GÉNÉRATEURS — FRACTIONS ASTUCIEUSES
+   ============================================================ */
+
+function gcd(a, b) { a = Math.abs(a); b = Math.abs(b); while (b) [a, b] = [b, a % b]; return a; }
+
+/* Format fraction sortie : "a/b" si b > 1, sinon "a" */
+function fmtFrac(a, b) {
+  if (b === 1) return a.toString();
+  if (a === 0) return '0';
+  return `${a}/${b}`;
+}
+
+/* Compare réponse user en fraction "a/b" ou "a,b" décimal à attendu (a, b) */
+function fracEquals(userStr, expA, expB) {
+  if (!userStr) return false;
+  const s = userStr.replace(',', '.').trim();
+  if (s.includes('/')) {
+    const [n, d] = s.split('/').map(x => parseFloat(x));
+    if (isNaN(n) || isNaN(d) || d === 0) return false;
+    // Comparer en valeur
+    return Math.abs(n / d - expA / expB) < 1e-6;
+  }
+  const v = parseFloat(s);
+  if (isNaN(v)) return false;
+  return Math.abs(v - expA / expB) < 1e-6;
+}
+
+/* Stage 1 : Diviseur commun express — simplifier a/b */
+function gen_frac_simplify() {
+  // On choisit un PGCD "trouvable" (2..12) et deux nombres premiers entre eux
+  const gcdVal = pick([2, 3, 4, 5, 6, 7, 8, 9, 12]);
+  const small = pick([[2,3],[3,4],[2,5],[3,5],[4,5],[5,6],[2,7],[3,7],[4,7],[5,7],[6,7],[3,8],[5,8],[7,8],[2,9],[4,9],[5,9],[7,9],[8,9],[3,10],[7,10]]);
+  const [n0, d0] = small;
+  const a = n0 * gcdVal;
+  const b = d0 * gcdVal;
+  return {
+    question: `Simplifie ${a}/${b}`,
+    answerFrac: [n0, d0],
+    answer: n0 / d0,
+    isFraction: true,
+    trick: "Diviseur commun express",
+    explanation: `<b>Astuce :</b> repère le <b>plus grand diviseur commun</b> entre ${a} et ${b}.<br>
+      <span class="step">${a} = ${gcdVal} × ${n0}</span>
+      <span class="step">${b} = ${gcdVal} × ${d0}</span>
+      <span class="step">Donc ${a}/${b} = <b>${n0}/${d0}</b></span>`
+  };
+}
+
+/* Stage 2 : Simplification en croix avant multiplication
+   (a×b) / (c×d) où a/c et b/d simplifient */
+function gen_frac_cross() {
+  // Choisis 2 paires qui se simplifient
+  const pairs = [[[6, 9], [4, 8]], [[10, 15], [6, 14]], [[12, 18], [10, 25]],
+                 [[8, 12], [9, 15]], [[14, 21], [10, 25]], [[15, 25], [8, 12]],
+                 [[6, 10], [8, 12]], [[9, 12], [10, 15]]];
+  const [[a, c], [b, d]] = pick(pairs);
+  const ga = gcd(a, c);
+  const gb = gcd(b, d);
+  const aS = a / ga, cS = c / ga;
+  const bS = b / gb, dS = d / gb;
+  const finalN = aS * bS;
+  const finalD = cS * dS;
+  const fg = gcd(finalN, finalD);
+  return {
+    question: `(${a} × ${b}) / (${c} × ${d})`,
+    answerFrac: [finalN / fg, finalD / fg],
+    answer: finalN / finalD,
+    isFraction: true,
+    trick: "Simplification en croix",
+    explanation: `<b>Astuce :</b> simplifie AVANT de multiplier !<br>
+      <span class="step">${a}/${c} → ÷${ga} → ${aS}/${cS}</span>
+      <span class="step">${b}/${d} → ÷${gb} → ${bS}/${dS}</span>
+      <span class="step">Reste : (${aS} × ${bS}) / (${cS} × ${dS}) = <b>${fmtFrac(finalN/fg, finalD/fg)}</b></span>`
+  };
+}
+
+/* Stage 3 : Fraction d'un nombre — toujours diviser d'abord
+   k/d × n  où n est multiple de d */
+function gen_frac_of_number() {
+  const d = pick([2, 3, 4, 5, 6, 8, 10]);
+  const k = rng(1, d - 1);
+  const m = rng(2, 12);
+  const n = d * m; // multiple de d
+  const r = k * m;
+  return {
+    question: `${k}/${d} × ${n}`,
+    answer: r,
+    trick: "Diviser d'abord !",
+    explanation: `<b>Astuce :</b> ne fais pas ${k} × ${n} = ${k*n} puis ÷${d}. C'est plus dur !<br>
+      <span class="step">D'abord ${n} ÷ ${d} = <b>${m}</b></span>
+      <span class="step">Puis × ${k} = <b>${r}</b></span>`
+  };
+}
+
+/* Stage 4 : Pourcentages = fractions */
+function gen_frac_pct() {
+  const cases = [
+    { pct: 50, frac: '1/2', op: 'la moitié' },
+    { pct: 25, frac: '1/4', op: 'le quart' },
+    { pct: 75, frac: '3/4', op: 'les trois quarts' },
+    { pct: 10, frac: '1/10', op: 'le dixième' },
+    { pct: 20, frac: '1/5', op: 'le cinquième' },
+    { pct: 12.5, frac: '1/8', op: 'le huitième' },
+  ];
+  const c = pick(cases);
+  // Choisis un nombre divisible
+  let n;
+  if (c.pct === 50) n = pick([24, 48, 60, 80, 100, 120, 150, 200, 250, 360]);
+  else if (c.pct === 25) n = pick([20, 40, 60, 80, 100, 120, 200, 240, 400, 600]);
+  else if (c.pct === 75) n = pick([20, 40, 60, 80, 100, 120, 200, 240, 400]);
+  else if (c.pct === 10) n = pick([20, 30, 50, 70, 80, 120, 150, 200, 350, 600]);
+  else if (c.pct === 20) n = pick([15, 25, 35, 50, 75, 100, 150, 200, 300]);
+  else n = pick([16, 24, 40, 56, 80, 120, 160, 200, 240, 320]);
+  const r = n * c.pct / 100;
+  return {
+    question: `${c.pct}% de ${n}`,
+    answer: r,
+    trick: "Pourcentage = fraction",
+    explanation: `<b>Astuce :</b> ${c.pct}% = <b>${c.frac}</b> = ${c.op} !<br>
+      <span class="step">${n} × ${c.frac}</span>
+      <span class="step">= <b>${r}</b></span>`
+  };
+}
+
+/* Stage 5 : Diviser par une fraction = multiplier par l'inverse */
+function gen_frac_divide_by() {
+  const d = pick([2, 3, 4, 5, 8]);
+  const k = pick([1, 2, 3, 4].filter(x => x < d));
+  const m = pick([12, 15, 16, 18, 20, 24, 30, 36, 40, 48, 60, 72]);
+  const r = m * d / k;
+  // S'assure que c'est entier
+  if (!Number.isInteger(r)) return gen_frac_divide_by();
+  return {
+    question: `${m} ÷ ${k}/${d}`,
+    answer: r,
+    trick: "Diviser par une fraction = ×inverse",
+    explanation: `<b>Magie :</b> diviser par ${k}/${d}, c'est multiplier par <b>${d}/${k}</b> !<br>
+      <span class="step">${m} ÷ ${k}/${d} = ${m} × ${d}/${k}</span>
+      <span class="step">= ${m * d}/${k}</span>
+      <span class="step">= <b>${r}</b></span>`
+  };
+}
+
+/* Stage 6 : Associer pour faire 1 — produits de fractions où tout se simplifie */
+function gen_frac_associate() {
+  // (a × b × c) / (d × e × f) où chaque paire se simplifie
+  const trios = [
+    { num: [7, 5, 12], den: [15, 14], r: [2, 1] },        // (7×5×12)/(15×14) = 2
+    { num: [9, 4, 10], den: [3, 5, 8], r: [3, 1] },       // (9×4×10)/(3×5×8) = 3
+    { num: [6, 8, 15], den: [4, 9, 10], r: [2, 1] },      // (6×8×15)/(4×9×10) = 2
+    { num: [12, 7, 25], den: [14, 5, 6], r: [5, 1] },     // (12×7×25)/(14×5×6) = 5
+    { num: [8, 9, 5], den: [3, 4, 15], r: [2, 1] },       // (8×9×5)/(3×4×15) = 2
+    { num: [10, 21, 4], den: [7, 6, 5], r: [4, 1] },      // (10×21×4)/(7×6×5) = 4
+    { num: [16, 15, 7], den: [5, 8, 21], r: [2, 1] },     // (16×15×7)/(5×8×21) = 2
+  ];
+  const t = pick(trios);
+  const numStr = t.num.join(' × ');
+  const denStr = t.den.join(' × ');
+  return {
+    question: `(${numStr}) / (${denStr})`,
+    answer: t.r[0] / t.r[1],
+    answerFrac: t.r,
+    isFraction: t.r[1] !== 1,
+    trick: "Associer pour simplifier",
+    explanation: `<b>Astuce :</b> avant de calculer, regarde ce qui se simplifie !<br>
+      <span class="step">Cherche les paires haut/bas qui ont des diviseurs communs</span>
+      <span class="step">Tout se simplifie pour donner <b>${fmtFrac(t.r[0], t.r[1])}</b></span>`
+  };
+}
+
+/* Stage 7 : Repérer les "amis" qui font 100, 1000... */
+function gen_frac_hidden_factor() {
+  const cases = [
+    { n: 125, d: 1000, hint: '125 × 8 = 1000', r: [1, 8] },
+    { n: 250, d: 1000, hint: '250 × 4 = 1000', r: [1, 4] },
+    { n: 500, d: 1000, hint: '500 × 2 = 1000', r: [1, 2] },
+    { n: 25, d: 100, hint: '25 × 4 = 100', r: [1, 4] },
+    { n: 75, d: 100, hint: '75 = 3 × 25', r: [3, 4] },
+    { n: 625, d: 1000, hint: '625 = 5 × 125 ; 1000 = 8 × 125', r: [5, 8] },
+    { n: 875, d: 1000, hint: '875 = 7 × 125', r: [7, 8] },
+    { n: 375, d: 1000, hint: '375 = 3 × 125', r: [3, 8] },
+    { n: 200, d: 1000, hint: '200 × 5 = 1000', r: [1, 5] },
+    { n: 40, d: 1000, hint: '40 × 25 = 1000', r: [1, 25] },
+  ];
+  const c = pick(cases);
+  return {
+    question: `Simplifie ${c.n}/${c.d}`,
+    answerFrac: c.r,
+    answer: c.r[0] / c.r[1],
+    isFraction: c.r[1] !== 1,
+    trick: "Repérer le facteur caché",
+    explanation: `<b>Astuce :</b> ${c.hint}<br>
+      <span class="step">${c.n}/${c.d} = <b>${fmtFrac(c.r[0], c.r[1])}</b></span>`
+  };
+}
+
+/* Stage 8 : Marathon — fractions astucieuses chaînées */
+function gen_frac_marathon() {
+  return pick([gen_frac_simplify, gen_frac_cross, gen_frac_of_number,
+               gen_frac_pct, gen_frac_divide_by, gen_frac_associate, gen_frac_hidden_factor])();
+}
+
+window.gcd = gcd;
+window.fmtFrac = fmtFrac;
+window.fracEquals = fracEquals;
 window.gen_pb_mix = gen_pb_mix;
 window.gen_pb_simple_add = gen_pb_simple_add;
 window.gen_pb_simple_sub = gen_pb_simple_sub;

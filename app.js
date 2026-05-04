@@ -1120,6 +1120,11 @@ function nextQuestion() {
   const trickText = ex.isReview ? `🔁 RÉVISION · ${ex.trick}` : (s.mode === 'boss' && s.bossPhase === 2 ? `👑 PHASE 2 · ${ex.trick}` : ex.trick);
   document.getElementById('exTrick').textContent = trickText;
   document.getElementById('exQuestion').innerHTML = formatQuestion(ex.question);
+  // Touche "/" pour les fractions
+  const fracKey = document.getElementById('exKeyFrac');
+  if (fracKey) fracKey.style.display = ex.isFraction ? '' : 'none';
+  const ans = document.getElementById('exAnswer');
+  if (ans) ans.placeholder = ex.isFraction ? 'ex: 3/4 ou 7' : '?';
   document.getElementById('exAnswer').value = '';
   let counter;
   if (s.mode === 'survival') counter = `Survie : ${s.correct} ✓`;
@@ -1214,7 +1219,13 @@ function submitAnswer(timeout = false) {
 
   const userInput = document.getElementById('exAnswer').value;
   const ex = s.currentEx;
-  const isGood = !timeout && answerEquals(userInput, ex.answer);
+  // Si l'exo attend une fraction, on tolère les 2 formats (a/b OU décimal équivalent)
+  let isGood;
+  if (ex.isFraction && ex.answerFrac) {
+    isGood = !timeout && fracEquals(userInput, ex.answerFrac[0], ex.answerFrac[1]);
+  } else {
+    isGood = !timeout && answerEquals(userInput, ex.answer);
+  }
 
   const elapsed = (Date.now() - s.questionStartTime) / 1000;
   stopTrickZone();
@@ -1330,9 +1341,12 @@ function showFeedback(good, ex, userInput, timeout = false) {
   const timeBadge = (good && elapsed != null && evalR)
     ? `<div class="time-badge time-${evalR.status.toLowerCase()}"><b>${evalR.emoji} ${elapsed.toFixed(1)}s</b><span>${evalR.label}</span></div>`
     : '';
+  const displayedAnswer = (ex.isFraction && ex.answerFrac)
+    ? fmtFrac(ex.answerFrac[0], ex.answerFrac[1])
+    : fmt(ex.answer);
   const eq = good
-    ? `${timeBadge}${formatQuestion(ex.question)} = <span class="res">${fmt(ex.answer)}</span>`
-    : `${formatQuestion(ex.question)} = <span class="res">${fmt(ex.answer)}</span>${userInput && !timeout ? `<br><small style="color:var(--bad);font-weight:400">Ta réponse : ${escapeHTML(userInput)}</small>` : ''}`;
+    ? `${timeBadge}${formatQuestion(ex.question)} = <span class="res">${displayedAnswer}</span>`
+    : `${formatQuestion(ex.question)} = <span class="res">${displayedAnswer}</span>${userInput && !timeout ? `<br><small style="color:var(--bad);font-weight:400">Ta réponse : ${escapeHTML(userInput)}</small>` : ''}`;
   document.getElementById('feedbackEq').innerHTML = eq;
 
   // Explication TOUJOURS — sauf en chrono où on file ET on a fait MASTERED
@@ -1788,7 +1802,12 @@ document.addEventListener('DOMContentLoaded', () => {
     b.addEventListener('click', () => {
       buzzTap();
       const k = b.dataset.key;
-      const inp = document.getElementById('exAnswer');
+      // On utilise un sélecteur dynamique : si on est sur le keypad de l'exercice (#exKeypad)
+      // ou du placement (#placementKeypad). Détermine via le parent.
+      const inp = b.closest('#placementKeypad')
+        ? document.getElementById('placementAnswer')
+        : document.getElementById('exAnswer');
+      if (!inp) return;
       if (k === 'back') inp.value = inp.value.slice(0, -1);
       else if (k === '-') {
         if (inp.value.startsWith('-')) inp.value = inp.value.slice(1);
@@ -1796,6 +1815,9 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       else if (k === ',') {
         if (!inp.value.includes(',')) inp.value += ',';
+      }
+      else if (k === '/') {
+        if (!inp.value.includes('/')) inp.value += '/';
       }
       else inp.value += k;
     });
