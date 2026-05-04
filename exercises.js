@@ -154,7 +154,12 @@ function gen_compl10() {
 }
 
 function gen_compl100() {
-  const n = rng(1, 99);
+  // Évite n=0 (pas un complément) ; on accepte les multiples de 10 mais on
+  // les rend rares (la vraie astuce est sur les unités != 0)
+  let n;
+  do {
+    n = rng(1, 99);
+  } while (n % 10 === 0 && Math.random() < 0.7); // baisse la fréquence des cas triviaux
   const r = 100 - n;
   return {
     question: `${n} + ? = 100`,
@@ -231,8 +236,28 @@ function gen_compl_long() {
 
 /* ---------- MONDE 3 : ASTUCES MULTIPLICATION ---------- */
 
+/* Évite les nombres proches d'un rond commun où la compensation gagne. */
+function _isNearRound(n) {
+  return Math.abs(n - 25) <= 4
+      || Math.abs(n - 50) <= 4
+      || Math.abs(n - 75) <= 4
+      || Math.abs(n - 100) <= 4
+      || Math.abs(n - 150) <= 4
+      || Math.abs(n - 200) <= 4;
+}
+function _pickAwayFromRound(min, max) {
+  let n;
+  do { n = rng(min, max); } while (_isNearRound(n));
+  return n;
+}
+
 function gen_x5() {
-  const n = pick([rng(12, 98), rng(12, 98) * 2]); // pair plus simple
+  // Pair => ×5 ÷ 2 reste entier, plus naturel
+  // Re-vérifie après le ×2 pour éviter de retomber sur un rond
+  let n;
+  do {
+    n = pick([_pickAwayFromRound(12, 88), rng(6, 44) * 2]);
+  } while (_isNearRound(n));
   const r = n * 5;
   return {
     question: `${n} × 5`,
@@ -245,7 +270,9 @@ function gen_x5() {
 }
 
 function gen_x50() {
-  const n = rng(4, 98);
+  // Pair pour que /2 reste entier, et pas proche d'un rond après doublage
+  let n;
+  do { n = rng(6, 44) * 2; } while (_isNearRound(n));
   return {
     question: `${n} × 50`,
     answer: n * 50,
@@ -257,7 +284,9 @@ function gen_x50() {
 }
 
 function gen_x25() {
-  const n = pick([4, 8, 12, 16, 20, 24, 28, 32, 36, 40, 44, 48, 52, 60, 100, rng(5, 80)]);
+  // Multiples de 4 → ×25 reste entier sans virgule, ×100÷4 immédiat
+  const multiples = [4, 8, 12, 16, 20, 24, 28, 32, 36, 40, 44, 48, 56, 60, 64, 68, 72, 76, 80, 84, 88, 92];
+  const n = pick(multiples);
   return {
     question: `${n} × 25`,
     answer: n * 25,
@@ -269,7 +298,9 @@ function gen_x25() {
 }
 
 function gen_x9() {
-  const n = rng(2, 99);
+  // Évite les nombres proches d'un rond (compensation gagne) :
+  // 49, 51, 99 ne sont PAS bons ici parce que 50×9 ou 100×9 sont plus rapides
+  const n = _pickAwayFromRound(3, 89);
   return {
     question: `${n} × 9`,
     answer: n * 9,
@@ -313,8 +344,17 @@ function gen_x15() {
   };
 }
 
+/* Pour ×4 et ×8 : on choisit n où le doublement successif est VRAIMENT
+   plus malin que la compensation autour de 25/50/100. */
+function _pickForDoubling(min, max) {
+  let n;
+  do { n = rng(min, max); }
+  while (Math.abs(n - 25) <= 4 || Math.abs(n - 50) <= 5 || Math.abs(n - 75) <= 4 || Math.abs(n - 100) <= 5);
+  return n;
+}
+
 function gen_x4() {
-  const n = rng(11, 99);
+  const n = _pickForDoubling(11, 89);
   return {
     question: `${n} × 4`,
     answer: n * 4,
@@ -326,7 +366,7 @@ function gen_x4() {
 }
 
 function gen_x8() {
-  const n = rng(11, 60);
+  const n = _pickForDoubling(12, 45);
   return {
     question: `${n} × 8`,
     answer: n * 8,
@@ -477,12 +517,15 @@ function gen_comp_long() {
   const a = pick([98, 99, 102, 49, 51]);
   const b = rng(3, 9);
   const c = rng(2, 9);
+  // Pivot CORRECT : 50 si a est près de 50, 100 sinon
+  const pivot = Math.abs(a - 50) <= 3 ? 50 : 100;
+  const diff = a - pivot;
   return {
     question: `${a} × ${b} + ${c}`,
     answer: a * b + c,
     trick: "Compenser puis finir",
-    explanation: `<span class="step">${a} ≈ ${a < 100 ? 100 : a < 60 ? 50 : 100}</span>
-      <span class="step">${a} × ${b} = <b>${a*b}</b></span>
+    explanation: `<span class="step">${a} ≈ ${pivot} (${diff >= 0 ? '+' : '−'} ${Math.abs(diff)})</span>
+      <span class="step">${a} × ${b} = ${pivot} × ${b} ${diff >= 0 ? '+' : '−'} ${Math.abs(diff)} × ${b} = <b>${a*b}</b></span>
       <span class="step">+ ${c} = <b>${a*b + c}</b></span>`
   };
 }
@@ -508,7 +551,11 @@ function gen_dist_simple() {
 
 function gen_dist_med() {
   // 23 × 6 = 20×6 + 3×6
-  const a = rng(21, 49);
+  // On évite : a multiple de 25 (×25 mieux), a proche de 50 (compensation mieux),
+  // a finissant par 0 (déjà rond, pas besoin de distributivité)
+  let a;
+  do { a = rng(21, 49); }
+  while (a % 25 === 0 || Math.abs(a - 50) <= 3 || a % 10 === 0);
   const b = rng(3, 9);
   const d = Math.floor(a/10)*10;
   const u = a % 10;
@@ -1668,12 +1715,14 @@ function gen_frac_cross() {
 }
 
 /* Stage 3 : Fraction d'un nombre — toujours diviser d'abord
-   k/d × n  où n est multiple de d */
+   k/d × n  où n est multiple de d. La fraction k/d doit être IRRÉDUCTIBLE
+   (sinon on présente une fraction qu'on aurait dû simplifier d'abord). */
 function gen_frac_of_number() {
   const d = pick([2, 3, 4, 5, 6, 8, 10]);
-  const k = rng(1, d - 1);
+  let k;
+  do { k = rng(1, d - 1); } while (gcd(k, d) !== 1); // fraction irréductible
   const m = rng(2, 12);
-  const n = d * m; // multiple de d
+  const n = d * m;
   const r = k * m;
   return {
     question: `${k}/${d} × ${n}`,
