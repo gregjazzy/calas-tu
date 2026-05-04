@@ -1470,8 +1470,8 @@ function showFeedback(good, ex, userInput, timeout = false) {
     icon = '✅';
     title = 'Bon ! Tu peux aller plus vite.';
   } else if (evalR && evalR.status === 'SLOW') {
-    icon = '🐢';
-    title = 'Tu as posé le calcul…';
+    icon = '👍';
+    title = 'Bonne réponse ! Et si on essayait le raccourci ?';
   } else {
     icon = pick(['🎉', '⭐']);
     title = 'Bien joué !';
@@ -1501,11 +1501,11 @@ function showFeedback(good, ex, userInput, timeout = false) {
     document.getElementById('feedbackExpl').style.display = '';
     let coachLine = '';
     if (good && evalR && evalR.status === 'CORRECT') {
-      coachLine = `<div class="coach-tip">⚡ Tu as répondu bien, mais en ${elapsed.toFixed(1)}s. Avec <b>${evalR.threshold.label}</b> tu peux le faire en moins de <b>${evalR.threshold.fast}s</b>. Regarde la méthode :</div>`;
+      coachLine = `<div class="coach-tip">⚡ Bien joué ! Avec un peu de pratique, tu peux appliquer <b>${evalR.threshold.label}</b> encore plus naturellement. Relis la méthode :</div>`;
     } else if (good && evalR && evalR.status === 'SLOW') {
-      coachLine = `<div class="coach-tip slow">🐢 ${elapsed.toFixed(1)}s, c'est un calcul brut. <b>L'astuce te le ferait en ${evalR.threshold.fast}s</b>. C'est ça qu'il faut intégrer :</div>`;
+      coachLine = `<div class="coach-tip slow">🐢 Tu as trouvé, mais on dirait que tu n'as pas pris le raccourci. <b>${evalR.threshold.label}</b> rend ce calcul beaucoup plus simple — viens voir comment :</div>`;
     } else if (good && evalR && evalR.status === 'MASTERED') {
-      coachLine = `<div class="coach-tip mastered">💎 ${elapsed.toFixed(1)}s — l'astuce est intégrée, parfait.</div>`;
+      coachLine = `<div class="coach-tip mastered">💎 Tu utilises bien l'astuce <b>${evalR.threshold.label}</b> — continue !</div>`;
     }
     document.getElementById('feedbackExpl').innerHTML = coachLine + ex.explanation;
   }
@@ -1687,10 +1687,10 @@ function finishSession() {
     if (tot > 0 && s.mode !== 'duel') {
       const masterRatio = Math.round((sc.MASTERED || 0) / tot * 100);
       let coachMsg;
-      if (masterRatio >= 70) coachMsg = `💎 <b>${masterRatio}%</b> de vrais réflexes — l'astuce est intégrée !`;
-      else if (masterRatio >= 40) coachMsg = `<b>${masterRatio}%</b> de réflexes. Continue à drill pour automatiser !`;
-      else if ((sc.SLOW||0) > 0) coachMsg = `Tu poses encore le calcul. <b>Relis la leçon</b> et drill pour intégrer l'astuce.`;
-      else coachMsg = `<b>${masterRatio}%</b> de réflexes. L'objectif : que l'astuce devienne automatique.`;
+      if (masterRatio >= 70) coachMsg = `💎 <b>${masterRatio}%</b> d'astuces utilisées avec aisance — bravo !`;
+      else if (masterRatio >= 40) coachMsg = `<b>${masterRatio}%</b> de tes réponses montrent l'astuce intégrée. Continue, ça vient !`;
+      else if ((sc.SLOW||0) > 0) coachMsg = `Tu trouves les bonnes réponses. <b>Essaye d'utiliser l'astuce</b> plutôt que de poser le calcul — relis la leçon !`;
+      else coachMsg = `<b>${masterRatio}%</b> d'astuces utilisées. L'objectif : que l'astuce devienne ton réflexe naturel.`;
 
       tEl.innerHTML = `
         <div class="rt rt-m"><b>${sc.MASTERED || 0}</b><span>💎 Réflexe</span></div>

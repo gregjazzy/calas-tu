@@ -1340,60 +1340,68 @@ function nextRank(level) {
    timeOk    : entre fast et ok → bon mais sans l'astuce         → ✅ CORRECT
    au-delà   : calcul brut                                       → 🐢 LENT
    Le seuil est ATTACHÉ AU GÉNÉRATEUR (drillKey ou nom de stage). */
-/* SEUILS DE TEMPS — calibrés sur "réflexion + 0.5s saisie".
-   Le temps mesuré n'est PAS le temps brut, mais le temps jusqu'au 1er tap
-   + 0.5s (coût uniforme de saisie). Donc ces seuils représentent la durée
-   d'astuce mentale, pas le temps de tape. */
+/* SEUILS DE TEMPS — philosophie BIENVEILLANTE
+   Le 💎 est attribué à un élève qui APPLIQUE CORRECTEMENT l'astuce, même
+   à un rythme normal (pas seulement aux champions ultra-rapides). Le 🐢
+   n'est réservé qu'aux cas où l'élève a clairement brute-forcé sans
+   utiliser l'astuce (≈ 2-3× le temps d'une méthode appliquée).
+
+   Les seuils sont calibrés sur : réflexion d'un élève qui APPLIQUE la
+   méthode + 0.5s plat de saisie. Donc :
+   - 💎 = élève qui applique correctement la méthode
+   - ✅ = élève qui a bon mais hésite
+   - 🐢 = clairement pas l'astuce (≥ ~2× la zone d'application)
+   - ❌ = faux. */
 const TIME_THRESHOLDS = {
-  // Monde Zéros — devrait être quasi-instantané
-  x10:        { fast: 2.5, ok: 5.0, label: 'Déplacer la virgule' },
-  x10dec:     { fast: 3.5, ok: 7.0, label: 'Déplacer la virgule (décimal)' },
-  div10:      { fast: 2.5, ok: 5.0, label: 'Déplacer la virgule à gauche' },
-  x01:        { fast: 3.5, ok: 7.0, label: '×0,1 = ÷10' },
-  div01:      { fast: 3.5, ok: 7.0, label: '÷0,1 = ×10' },
+  // Monde Zéros
+  x10:        { fast: 4.0, ok: 8.0, label: 'Déplacer la virgule' },
+  x10dec:     { fast: 5.0, ok: 10.0, label: 'Déplacer la virgule (décimal)' },
+  div10:      { fast: 4.0, ok: 8.0, label: 'Déplacer la virgule à gauche' },
+  x01:        { fast: 5.0, ok: 10.0, label: '×0,1 = ÷10' },
+  div01:      { fast: 5.0, ok: 10.0, label: '÷0,1 = ×10' },
   // Compléments
-  compl10:    { fast: 2.5, ok: 4.5, label: 'Complément à 10' },
-  compl100:   { fast: 4.0, ok: 8.0, label: 'Complément à 100' },
-  complRound: { fast: 3.5, ok: 6.5, label: 'Complément à la dizaine' },
-  compl1000:  { fast: 5.5, ok: 11.0, label: 'Complément à 1000' },
-  complDec:   { fast: 3.5, ok: 7.0, label: 'Complément à 1' },
+  compl10:    { fast: 3.5, ok: 7.0, label: 'Complément à 10' },
+  compl100:   { fast: 5.0, ok: 10.0, label: 'Complément à 100' },
+  complRound: { fast: 4.5, ok: 9.0, label: 'Complément à la dizaine' },
+  compl1000:  { fast: 7.0, ok: 14.0, label: 'Complément à 1000' },
+  complDec:   { fast: 5.0, ok: 10.0, label: 'Complément à 1' },
   // Multiplications astucieuses
-  x5:         { fast: 5.0, ok: 9.0, label: '×5 = ×10÷2' },
-  x9:         { fast: 5.0, ok: 10.0, label: '×9 = ×10−n' },
-  x11:        { fast: 5.0, ok: 11.0, label: '×11 (truc des 2 chiffres)' },
-  x25_50:     { fast: 6.0, ok: 11.0, label: '×25 ou ×50' },
-  x4_8:       { fast: 5.0, ok: 10.0, label: 'Doublage en série' },
+  x5:         { fast: 6.0, ok: 12.0, label: '×5 = ×10÷2' },
+  x9:         { fast: 7.0, ok: 14.0, label: '×9 = ×10−n' },
+  x11:        { fast: 7.0, ok: 14.0, label: '×11 (truc des 2 chiffres)' },
+  x25_50:     { fast: 8.0, ok: 16.0, label: '×25 ou ×50' },
+  x4_8:       { fast: 7.0, ok: 14.0, label: 'Doublage en série' },
   // Décomposition
-  addDecomp:  { fast: 5.0, ok: 10.0, label: 'Décomposition addition' },
-  subDecomp:  { fast: 6.0, ok: 11.0, label: 'Décomposition soustraction' },
-  friends:    { fast: 6.5, ok: 13.0, label: 'Repérer les amis (100)' },
+  addDecomp:  { fast: 7.0, ok: 14.0, label: 'Décomposition addition' },
+  subDecomp:  { fast: 8.0, ok: 16.0, label: 'Décomposition soustraction' },
+  friends:    { fast: 8.0, ok: 16.0, label: 'Repérer les amis (100)' },
   // Compensation
-  compMult:   { fast: 6.5, ok: 13.0, label: 'Compensation multiplication' },
-  compSub:    { fast: 6.0, ok: 11.0, label: 'Soustraction équivalente' },
+  compMult:   { fast: 9.0, ok: 18.0, label: 'Compensation multiplication' },
+  compSub:    { fast: 8.0, ok: 16.0, label: 'Soustraction équivalente' },
   // Distributivité
-  distSimple: { fast: 6.5, ok: 13.0, label: 'Distributivité' },
-  distMed:    { fast: 8.0, ok: 16.0, label: 'Distributivité +' },
-  distFactor: { fast: 8.0, ok: 16.0, label: 'Factorisation' },
+  distSimple: { fast: 9.0, ok: 18.0, label: 'Distributivité' },
+  distMed:    { fast: 11.0, ok: 22.0, label: 'Distributivité +' },
+  distFactor: { fast: 11.0, ok: 22.0, label: 'Factorisation' },
   // Carrés
-  carre5:     { fast: 5.0, ok: 10.0, label: 'Carré en 5' },
-  carreSimple:{ fast: 9.0, ok: 18.0, label: 'Carré décomposé' },
-  carre100:   { fast: 8.0, ok: 16.0, label: 'Carré près de 100' },
-  // Fractions (lecture + simplification, on est tolérants)
-  fracSimplify: { fast: 6.5, ok: 13.0, label: 'Diviseur commun' },
-  fracPct:      { fast: 6.5, ok: 13.0, label: 'Pourcentage = fraction' },
-  fracOfN:      { fast: 6.5, ok: 13.0, label: 'Fraction d\'un nombre' },
-  fracDivBy:    { fast: 8.0, ok: 16.0, label: 'Diviser par fraction' },
-  fracHidden:   { fast: 6.5, ok: 13.0, label: 'Facteur caché' },
-  fracCross:    { fast: 11.0, ok: 22.0, label: 'Simplification en croix' },
-  fracAssoc:    { fast: 11.0, ok: 22.0, label: 'Association' },
-  // Problèmes (lecture lente)
-  pbAdd:      { fast: 10.0, ok: 20.0, label: 'Problème addition' },
-  pbSub:      { fast: 10.0, ok: 20.0, label: 'Problème soustraction' },
-  pbMult:     { fast: 11.0, ok: 22.0, label: 'Problème multiplication' },
-  pbDiv:      { fast: 10.0, ok: 20.0, label: 'Problème partage' },
-  pbPct:      { fast: 11.0, ok: 22.0, label: 'Problème pourcentage' },
+  carre5:     { fast: 6.0, ok: 12.0, label: 'Carré en 5' },
+  carreSimple:{ fast: 12.0, ok: 24.0, label: 'Carré décomposé' },
+  carre100:   { fast: 10.0, ok: 20.0, label: 'Carré près de 100' },
+  // Fractions
+  fracSimplify: { fast: 8.0, ok: 16.0, label: 'Diviseur commun' },
+  fracPct:      { fast: 8.0, ok: 16.0, label: 'Pourcentage = fraction' },
+  fracOfN:      { fast: 8.0, ok: 16.0, label: 'Fraction d\'un nombre' },
+  fracDivBy:    { fast: 10.0, ok: 20.0, label: 'Diviser par fraction' },
+  fracHidden:   { fast: 8.0, ok: 16.0, label: 'Facteur caché' },
+  fracCross:    { fast: 14.0, ok: 28.0, label: 'Simplification en croix' },
+  fracAssoc:    { fast: 14.0, ok: 28.0, label: 'Association' },
+  // Problèmes (lecture + compréhension + calcul)
+  pbAdd:      { fast: 14.0, ok: 28.0, label: 'Problème addition' },
+  pbSub:      { fast: 14.0, ok: 28.0, label: 'Problème soustraction' },
+  pbMult:     { fast: 15.0, ok: 30.0, label: 'Problème multiplication' },
+  pbDiv:      { fast: 14.0, ok: 28.0, label: 'Problème partage' },
+  pbPct:      { fast: 15.0, ok: 30.0, label: 'Problème pourcentage' },
   // Fallback générique
-  _default:   { fast: 8.0, ok: 16.0, label: 'Calcul mental' },
+  _default:   { fast: 10.0, ok: 20.0, label: 'Calcul mental' },
 };
 
 function thresholdFor(drillKey) {
