@@ -1466,17 +1466,27 @@ function showFeedback(good, ex, userInput, timeout = false) {
   const evalR = s && s.lastEval;
   const elapsed = s && s.lastElapsed;
 
+  // Marque qu'on est en train d'expliquer une erreur (pour le retry)
+  if (s) s._wasWrong = !good;
+
   // Icône + titre selon le STATUT (pas juste juste/faux)
   let icon, title;
   if (!good) {
     icon = timeout ? '⏰' : '😅';
-    title = timeout ? 'Temps écoulé !' : pick(COMFORT_PHRASES.slice(0, 2).concat(['Pas grave !']));
+    if (s && s._inRetry) {
+      title = 'Pas grave, on l\'a tous fait. Lis bien la méthode :';
+    } else {
+      title = timeout ? 'Temps écoulé !' : pick(COMFORT_PHRASES.slice(0, 2).concat(['Pas grave !']));
+    }
   } else if (evalR && evalR.status === 'MASTERED') {
     icon = pick(['💎', '⚡', '🔥', '✨']);
     title = s.streak >= 3 ? pick(HYPE_PHRASES) : pick(['Réflexe parfait !', 'Astuce maîtrisée !', 'C\'est ça !', 'Boom !']);
   } else if (evalR && evalR.status === 'CORRECT') {
     icon = '✅';
     title = 'Bon ! Tu peux aller plus vite.';
+  } else if (s && s._inRetry && evalR && (evalR.status === 'MASTERED' || evalR.status === 'CORRECT')) {
+    icon = '🎯';
+    title = 'Voilà, c\'est ça ! Bien retenu.';
   } else if (evalR && evalR.status === 'SLOW') {
     icon = '👍';
     title = 'Bonne réponse ! Et si on essayait le raccourci ?';
@@ -1518,29 +1528,63 @@ function showFeedback(good, ex, userInput, timeout = false) {
     document.getElementById('feedbackExpl').innerHTML = coachLine + ex.explanation;
   }
 
-  // En chrono : on n'attend pas le clic, on enchaîne après 800ms
+  // Bouton "Suivant" : configuration selon le contexte
+  const btnNext = document.getElementById('btnNext');
+  // Reset visuel (anti-état figé d'une session précédente)
+  btnNext.style.display = '';
+  btnNext.disabled = false;
+  btnNext.classList.remove('countdown');
+  btnNext.style.opacity = '';
+
+  // En chrono ET bonne réponse : auto-avance après 800ms (pas d'apprentissage forcé)
   if (isChrono && good) {
     fb.classList.add('show');
-    document.getElementById('btnNext').style.display = 'none';
+    btnNext.style.display = 'none';
     setTimeout(() => {
-      document.getElementById('btnNext').style.display = '';
+      btnNext.style.display = '';
       const cur = state.session;
-      // Garde-fou : ne déclenche que si la session est toujours active ET non finie
       if (cur && !cur._finished && fb.classList.contains('show')) nextAfterFeedback();
     }, 800);
-  } else if (isChrono && !good) {
-    document.getElementById('btnNext').style.display = '';
-    fb.classList.add('show');
-  } else {
-    document.getElementById('btnNext').style.display = '';
-    fb.classList.add('show');
+    return;
   }
+
+  // ERREUR : on FORCE l'attention sur l'explication (apprentissage prioritaire)
+  if (!good) {
+    btnNext.textContent = "J'ai compris →";
+    // Délai obligatoire de 4 secondes : l'œil tombe sur l'explication
+    btnNext.disabled = true;
+    btnNext.classList.add('countdown');
+    let secondsLeft = 4;
+    btnNext.dataset.countdown = secondsLeft;
+    btnNext.style.opacity = '0.5';
+    const tick = () => {
+      secondsLeft--;
+      btnNext.dataset.countdown = secondsLeft;
+      if (secondsLeft <= 0) {
+        clearInterval(s._countdownTimer);
+        s._countdownTimer = null;
+        btnNext.disabled = false;
+        btnNext.classList.remove('countdown');
+        btnNext.style.opacity = '';
+        delete btnNext.dataset.countdown;
+        btnNext.textContent = "J'ai compris →";
+      }
+    };
+    if (s._countdownTimer) clearInterval(s._countdownTimer);
+    s._countdownTimer = setInterval(tick, 1000);
+  } else {
+    // Bonne réponse classique : bouton normal disponible immédiatement
+    btnNext.textContent = "Suivant →";
+  }
+  fb.classList.add('show');
 }
 
 function nextAfterFeedback() {
   document.getElementById('feedback').classList.remove('show');
   const s = state.session;
-  if (!s || s._finished) return; // session terminée → on ne fait plus rien
+  if (!s || s._finished) return;
+  // Stoppe le countdown s'il tourne encore
+  if (s._countdownTimer) { clearInterval(s._countdownTimer); s._countdownTimer = null; }
   // Libère le verrou de soumission pour la prochaine question
   s._submitting = false;
   // Mode survie : si 0 vie, fin
@@ -1548,7 +1592,38 @@ function nextAfterFeedback() {
     finishSession();
     return;
   }
+  // RETRY après erreur : on REJOUE le même calcul une fois pour valider
+  // que l'enfant a vraiment compris l'astuce. Sauf en mode chrono (vitesse) où
+  // on ne peut pas perdre du temps, et sauf si on est déjà en retry.
+  const isChrono = s.mode === 'chrono' || s.mode === 'worldchrono';
+  if (s._wasWrong && !s._inRetry && !isChrono) {
+    s._inRetry = true;
+    s._wasWrong = false;
+    retryCurrentQuestion();
+    return;
+  }
+  // Sinon on avance vraiment
+  s._inRetry = false;
+  s._wasWrong = false;
   nextQuestion();
+}
+
+/* Réaffiche le MÊME exo (pas de count++) pour forcer la maîtrise */
+function retryCurrentQuestion() {
+  const s = state.session;
+  if (!s || !s.currentEx) return;
+  const ex = s.currentEx;
+  // UI : on rebascule sur l'écran d'exercice (déjà dessus normalement)
+  document.getElementById('exTrick').textContent = '🔁 Reprenons : applique la méthode';
+  document.getElementById('exQuestion').innerHTML = formatQuestion(ex.question);
+  document.getElementById('exAnswer').value = '';
+  // Reset compteur visuel timing pour ce retry
+  s.questionStartTime = Date.now();
+  s.firstKeyTime = null;
+  startTrickZone(ex.drillKey || s.drillKey);
+  // Touche fraction
+  const fracKey = document.getElementById('exKeyFrac');
+  if (fracKey) fracKey.style.display = ex.isFraction ? '' : 'none';
 }
 
 function finishSession() {

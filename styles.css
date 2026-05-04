@@ -928,6 +928,21 @@ input { font-family: inherit; }
   border-color: rgba(6, 214, 160, 0.4);
 }
 .feedback-equation .res { color: var(--good); }
+/* Bouton "J'ai compris" en countdown après erreur */
+#btnNext.countdown {
+  position: relative;
+  pointer-events: none;
+}
+#btnNext.countdown::after {
+  content: " (" attr(data-countdown) "s)";
+  font-weight: 700;
+  margin-left: 4px;
+}
+#btnNext.countdown {
+  background: linear-gradient(135deg, #888 0%, #aaa 100%);
+  color: rgba(0,0,0,0.6);
+}
+
 .feedback-explanation {
   background: rgba(76, 201, 240, 0.12);
   border-left: 3px solid var(--info);
