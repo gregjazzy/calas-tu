@@ -87,14 +87,38 @@ function recordActivity(profile, exos, correct, xp, seconds) {
 }
 
 function recordSkill(profile, drillKey, correct) {
+  // Conservé pour compat — utilise l'évaluation binaire
+  recordSkillStatus(profile, drillKey, correct ? 'MASTERED' : 'WRONG', null);
+}
+
+function recordSkillStatus(profile, drillKey, status, elapsed) {
   if (!drillKey) return;
-  const s = profile.skills[drillKey] = profile.skills[drillKey] || { seen: 0, correct: 0, errors: 0, box: 1, lastSeen: 0, nextReview: 0 };
+  const s = profile.skills[drillKey] = profile.skills[drillKey] || {
+    seen: 0, correct: 0, errors: 0, box: 1, lastSeen: 0, nextReview: 0,
+    mastered: 0, slow: 0, avgTime: null, bestTime: null,
+  };
   s.seen++;
   s.lastSeen = Date.now();
-  if (correct) {
+
+  // Mise à jour vitesse moyenne et meilleure
+  if (elapsed != null && status !== 'WRONG') {
+    s.avgTime = s.avgTime == null ? elapsed : (s.avgTime * 0.7 + elapsed * 0.3);
+    if (s.bestTime == null || elapsed < s.bestTime) s.bestTime = elapsed;
+  }
+
+  if (status === 'MASTERED') {
     s.correct++;
-    s.box = Math.min(5, s.box + 1);
-  } else {
+    s.mastered = (s.mastered || 0) + 1;
+    s.box = Math.min(5, s.box + 1); // monte vraiment
+  } else if (status === 'CORRECT') {
+    s.correct++;
+    // Bon mais sans astuce — on ne monte PAS la box (l'astuce n'est pas réflexe)
+    // Mais on ne descend pas non plus. C'est neutre.
+  } else if (status === 'SLOW') {
+    s.correct++;
+    s.slow = (s.slow || 0) + 1;
+    s.box = Math.max(1, s.box - 1); // calcul brut → l'astuce n'est pas là, à retravailler
+  } else { // WRONG
     s.errors++;
     s.box = Math.max(1, s.box - 1);
   }
@@ -441,6 +465,39 @@ function initAudioOnce() {
 document.addEventListener('touchstart', initAudioOnce, { once: true, passive: true });
 document.addEventListener('click', initAudioOnce, { once: true });
 
+/* ---------- Barre "zone d'astuce" ---------- */
+let trickZoneTimer = null;
+function startTrickZone(drillKey) {
+  const zone = document.getElementById('trickZone');
+  const bar = document.getElementById('trickZoneBar');
+  const mF = document.getElementById('trickZoneMarkerFast');
+  const mO = document.getElementById('trickZoneMarkerOk');
+  if (!zone || !bar) return;
+  if (trickZoneTimer) cancelAnimationFrame(trickZoneTimer);
+
+  const t = thresholdFor(drillKey);
+  // L'échelle visuelle = 1.5 × ok pour laisser voir la zone rouge
+  const maxSec = t.ok * 1.5;
+  // Place les marqueurs aux frontières
+  if (mF) mF.style.left = (t.fast / maxSec * 100) + '%';
+  if (mO) mO.style.left = (t.ok / maxSec * 100) + '%';
+  zone.style.display = 'block';
+  bar.style.width = '0%';
+
+  const start = Date.now();
+  function tick() {
+    const elapsed = (Date.now() - start) / 1000;
+    const pct = Math.min(100, elapsed / maxSec * 100);
+    bar.style.width = pct + '%';
+    if (pct < 100) trickZoneTimer = requestAnimationFrame(tick);
+  }
+  trickZoneTimer = requestAnimationFrame(tick);
+}
+function stopTrickZone() {
+  if (trickZoneTimer) cancelAnimationFrame(trickZoneTimer);
+  trickZoneTimer = null;
+}
+
 /* ---------- Effets visuels fun ---------- */
 function comboFlash(text) {
   const el = document.createElement('div');
@@ -463,7 +520,7 @@ function xpPopup(amount, x, y) {
 function trophyToast(trophy) {
   const el = document.createElement('div');
   el.className = 'trophy-toast';
-  el.innerHTML = `<div class="te">${trophy.emoji}</div><div><div class="tt">Trophée débloqué !</div><div class="tn">${trophy.name}</div></div>`;
+  el.innerHTML = `<div class="te">${trophy.emoji}</div><div><div class="tt">Trophée débloqué !</div><div class="tn">${escapeHTML(trophy.name)}</div></div>`;
   document.body.appendChild(el);
   buzzTrophy();
   [800, 1000, 1200, 1500].forEach((f, i) => setTimeout(() => tone(f, 0.1, 'triangle', 0.18), i * 80));
@@ -992,6 +1049,9 @@ function startExercise(opts) {
 
   ses.questionStartTime = 0;
   ses.startedAt = Date.now();
+  // Compteurs par statut pour le score "astuces vraiment prises"
+  ses.statusCount = { MASTERED: 0, CORRECT: 0, SLOW: 0, WRONG: 0 };
+  ses.timesByDrill = {}; // { drillKey: [t1,t2,...] }
   state.session = ses;
   // Marque le monde comme visité (trophée Globetrotteur)
   if (opts.world) {
@@ -1053,6 +1113,8 @@ function nextQuestion() {
   s.currentEx = ex;
   s.count++;
   s.questionStartTime = Date.now();
+  // Démarre la barre "zone d'astuce" pour cet exo
+  startTrickZone(ex.drillKey || s.drillKey);
 
   // UI
   const trickText = ex.isReview ? `🔁 RÉVISION · ${ex.trick}` : (s.mode === 'boss' && s.bossPhase === 2 ? `👑 PHASE 2 · ${ex.trick}` : ex.trick);
@@ -1125,13 +1187,24 @@ function nextQuestion() {
 }
 
 function formatQuestion(q) {
-  // Coloration des opérateurs
-  return q
-    .replace(/×/g, '<span class="op">×</span>')
-    .replace(/÷/g, '<span class="op">÷</span>')
-    .replace(/\+/g, '<span class="op">+</span>')
-    .replace(/−/g, '<span class="op">−</span>')
-    .replace(/=/g, '<span class="op">=</span>');
+  // 1. Si la chaîne contient déjà du HTML (double appel), on n'y retouche pas
+  if (typeof q !== 'string') q = String(q);
+  if (q.indexOf('<span') !== -1) return q;
+  // 2. Échappe d'abord les caractères HTML pour éviter toute interprétation parasite
+  let s = q.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+  // 3. Remplace les opérateurs par des marqueurs intermédiaires (insensibles à toute ré-évaluation)
+  s = s.replace(/×/g, 'MUL');
+  s = s.replace(/÷/g, 'DIV');
+  s = s.replace(/\+/g, 'ADD');
+  s = s.replace(/−/g, 'SUB');
+  s = s.replace(/=/g, 'EQ');
+  // 4. Construit le HTML final
+  s = s.replace(/MUL/g, '<span class="op">×</span>');
+  s = s.replace(/DIV/g, '<span class="op">÷</span>');
+  s = s.replace(/ADD/g, '<span class="op">+</span>');
+  s = s.replace(/SUB/g, '<span class="op">−</span>');
+  s = s.replace(/EQ/g, '<span class="op">=</span>');
+  return s;
 }
 
 function submitAnswer(timeout = false) {
@@ -1144,15 +1217,38 @@ function submitAnswer(timeout = false) {
   const isGood = !timeout && answerEquals(userInput, ex.answer);
 
   const elapsed = (Date.now() - s.questionStartTime) / 1000;
+  stopTrickZone();
+
+  // Évaluation 4 niveaux (justesse + vitesse)
+  const evalResult = evaluateAnswer(isGood, elapsed, ex.drillKey);
+  s.statusCount[evalResult.status] = (s.statusCount[evalResult.status] || 0) + 1;
+  if (ex.drillKey) {
+    s.timesByDrill[ex.drillKey] = s.timesByDrill[ex.drillKey] || [];
+    s.timesByDrill[ex.drillKey].push(elapsed);
+  }
 
   // Enregistre la skill pour la révision espacée + suivi des faiblesses
-  if (ex.drillKey) recordSkill(state.current, ex.drillKey, isGood);
+  // ATTENTION : "MASTERED" → bonne avec astuce → on monte fort.
+  //             "CORRECT" → bon mais lent → on traite comme à demi-acquis (pas de montée Leitner).
+  //             "SLOW" → bon mais brut → traité comme une erreur côté Leitner (à reprendre).
+  //             "WRONG" → faux → idem erreur classique.
+  if (ex.drillKey) recordSkillStatus(state.current, ex.drillKey, evalResult.status, elapsed);
+
+  // Stocke l'évaluation pour le feedback
+  s.lastEval = evalResult;
+  s.lastElapsed = elapsed;
 
   if (isGood) {
     s.correct++;
     s.streak++;
     s.streakMax = Math.max(s.streakMax, s.streak);
-    sndGood();
+    // Son différencié selon que c'est un vrai réflexe ou pas
+    if (evalResult.status === 'MASTERED') {
+      sndGood();
+      tone(1320, 0.08, 'sine', 0.12); // ping cristallin bonus pour réflexe
+    } else {
+      sndGood();
+    }
     buzzGood();
 
     // Fast answer (< 3s) → trophée Tir Rapide
@@ -1205,29 +1301,57 @@ function showFeedback(good, ex, userInput, timeout = false) {
   card.classList.toggle('good', good);
   card.classList.toggle('bad', !good);
 
-  // En mode chrono, feedback ultra-court (juste juste/faux + bonne réponse)
-  // pour ne pas perdre de temps. La méthode sera revue plus tard.
   const isChrono = s && (s.mode === 'chrono' || s.mode === 'worldchrono');
+  const evalR = s && s.lastEval;
+  const elapsed = s && s.lastElapsed;
 
-  document.getElementById('feedbackIcon').textContent = good
-    ? pick(['🎉', '⭐', '💯', '🔥', '👏', '✨', '🚀'])
-    : (timeout ? '⏰' : '😅');
-  document.getElementById('feedbackTitle').textContent = good
-    ? (s && s.streak >= 3 ? pick(HYPE_PHRASES) : pick(['Bien joué !', 'Bravo !', 'Excellent !', 'Génial !', 'Parfait !']))
-    : (timeout ? 'Temps écoulé !' : pick(COMFORT_PHRASES.slice(0, 2).concat(['Pas grave !'])));
+  // Icône + titre selon le STATUT (pas juste juste/faux)
+  let icon, title;
+  if (!good) {
+    icon = timeout ? '⏰' : '😅';
+    title = timeout ? 'Temps écoulé !' : pick(COMFORT_PHRASES.slice(0, 2).concat(['Pas grave !']));
+  } else if (evalR && evalR.status === 'MASTERED') {
+    icon = pick(['💎', '⚡', '🔥', '✨']);
+    title = s.streak >= 3 ? pick(HYPE_PHRASES) : pick(['Réflexe parfait !', 'Astuce maîtrisée !', 'C\'est ça !', 'Boom !']);
+  } else if (evalR && evalR.status === 'CORRECT') {
+    icon = '✅';
+    title = 'Bon ! Tu peux aller plus vite.';
+  } else if (evalR && evalR.status === 'SLOW') {
+    icon = '🐢';
+    title = 'Tu as posé le calcul…';
+  } else {
+    icon = pick(['🎉', '⭐']);
+    title = 'Bien joué !';
+  }
+  document.getElementById('feedbackIcon').textContent = icon;
+  document.getElementById('feedbackTitle').textContent = title;
 
+  // Affichage de l'équation + chrono mesuré
+  const timeBadge = (good && elapsed != null && evalR)
+    ? `<div class="time-badge time-${evalR.status.toLowerCase()}"><b>${evalR.emoji} ${elapsed.toFixed(1)}s</b><span>${evalR.label}</span></div>`
+    : '';
   const eq = good
-    ? `${formatQuestion(ex.question)} = <span class="res">${fmt(ex.answer)}</span>`
+    ? `${timeBadge}${formatQuestion(ex.question)} = <span class="res">${fmt(ex.answer)}</span>`
     : `${formatQuestion(ex.question)} = <span class="res">${fmt(ex.answer)}</span>${userInput && !timeout ? `<br><small style="color:var(--bad);font-weight:400">Ta réponse : ${escapeHTML(userInput)}</small>` : ''}`;
   document.getElementById('feedbackEq').innerHTML = eq;
 
-  // Explication TOUJOURS — c'est le moment d'apprentissage (sauf en chrono où on file)
-  if (isChrono && good) {
+  // Explication TOUJOURS — sauf en chrono où on file ET on a fait MASTERED
+  // (Si CORRECT/SLOW : on AFFICHE l'explication même en chrono, pour forcer l'apprentissage)
+  const skipExpl = isChrono && good && evalR && evalR.status === 'MASTERED';
+  if (skipExpl) {
     document.getElementById('feedbackExpl').innerHTML = '';
     document.getElementById('feedbackExpl').style.display = 'none';
   } else {
     document.getElementById('feedbackExpl').style.display = '';
-    document.getElementById('feedbackExpl').innerHTML = ex.explanation;
+    let coachLine = '';
+    if (good && evalR && evalR.status === 'CORRECT') {
+      coachLine = `<div class="coach-tip">⚡ Tu as répondu bien, mais en ${elapsed.toFixed(1)}s. Avec <b>${evalR.threshold.label}</b> tu peux le faire en moins de <b>${evalR.threshold.fast}s</b>. Regarde la méthode :</div>`;
+    } else if (good && evalR && evalR.status === 'SLOW') {
+      coachLine = `<div class="coach-tip slow">🐢 ${elapsed.toFixed(1)}s, c'est un calcul brut. <b>L'astuce te le ferait en ${evalR.threshold.fast}s</b>. C'est ça qu'il faut intégrer :</div>`;
+    } else if (good && evalR && evalR.status === 'MASTERED') {
+      coachLine = `<div class="coach-tip mastered">💎 ${elapsed.toFixed(1)}s — l'astuce est intégrée, parfait.</div>`;
+    }
+    document.getElementById('feedbackExpl').innerHTML = coachLine + ex.explanation;
   }
 
   // En chrono : on n'attend pas le clic, on enchaîne après 1.2s
@@ -1291,9 +1415,20 @@ function finishSession() {
     score = s.correct;
     total = s.total;
     const ratio = score / total;
-    xpGain = Math.round(score * 10 * (s.mode === 'boss' ? 1.5 : s.mode === 'daily' ? 1.3 : 1));
+    const mastered = s.statusCount.MASTERED || 0;
+    const masteredRatio = mastered / total;
+    // Bonus XP en fonction des MASTERED (réflexes astuce) — c'est ça qu'on récompense
+    xpGain = Math.round(score * 8 + mastered * 4);
+    xpGain = Math.round(xpGain * (s.mode === 'boss' ? 1.5 : s.mode === 'daily' ? 1.3 : 1));
     if (s.streakMax >= 5) xpGain += 20;
-    stars = ratio === 1 ? 3 : ratio >= 0.8 ? 2 : ratio >= 0.5 ? 1 : 0;
+    // ÉTOILES selon ASTUCE PRISE, pas seulement justesse :
+    //   3★ : 100% bons ET ≥ 70% en réflexe (astuce intégrée)
+    //   2★ : ≥ 80% bons ET ≥ 40% en réflexe (bon mais à automatiser)
+    //   1★ : ≥ 50% bons (ou tout bon mais lent — il faut retravailler la méthode)
+    if (ratio === 1 && masteredRatio >= 0.7) stars = 3;
+    else if (ratio >= 0.8 && masteredRatio >= 0.4) stars = 2;
+    else if (ratio >= 0.5) stars = 1;
+    else stars = 0;
   }
 
   // Streak global
@@ -1387,6 +1522,31 @@ function finishSession() {
   document.getElementById('resBest').textContent = bestVal;
   document.getElementById('resStars').innerHTML =
     (s.mode === 'survival' || isChronoMode) ? '' : `${'★'.repeat(stars)}${'☆'.repeat(3-stars)}`;
+
+  // Décomposition par statut (justesse + vitesse)
+  const tEl = document.getElementById('resTricks');
+  if (tEl) {
+    const sc = s.statusCount || {};
+    const tot = (sc.MASTERED || 0) + (sc.CORRECT || 0) + (sc.SLOW || 0) + (sc.WRONG || 0);
+    if (tot > 0 && s.mode !== 'duel') {
+      const masterRatio = Math.round((sc.MASTERED || 0) / tot * 100);
+      let coachMsg;
+      if (masterRatio >= 70) coachMsg = `💎 <b>${masterRatio}%</b> de vrais réflexes — l'astuce est intégrée !`;
+      else if (masterRatio >= 40) coachMsg = `<b>${masterRatio}%</b> de réflexes. Continue à drill pour automatiser !`;
+      else if ((sc.SLOW||0) > 0) coachMsg = `Tu poses encore le calcul. <b>Relis la leçon</b> et drill pour intégrer l'astuce.`;
+      else coachMsg = `<b>${masterRatio}%</b> de réflexes. L'objectif : que l'astuce devienne automatique.`;
+
+      tEl.innerHTML = `
+        <div class="rt rt-m"><b>${sc.MASTERED || 0}</b><span>💎 Réflexe</span></div>
+        <div class="rt rt-c"><b>${sc.CORRECT || 0}</b><span>✅ Bon</span></div>
+        <div class="rt rt-s"><b>${sc.SLOW || 0}</b><span>🐢 Lent</span></div>
+        <div class="rt rt-w"><b>${sc.WRONG || 0}</b><span>❌ Faux</span></div>
+        <div class="results-tricks-summary">${coachMsg}</div>
+      `;
+    } else {
+      tEl.innerHTML = '';
+    }
+  }
   const badgesEl = document.getElementById('resBadges');
   badgesEl.innerHTML = '';
   if (lvlGain > 0) {
@@ -1497,7 +1657,28 @@ document.addEventListener('DOMContentLoaded', () => {
     state.current = p;
     state.data.lastProfile = p.id;
     saveData();
-    showMap();
+    // Test de placement pour évaluer le niveau d'astuces
+    document.getElementById('placementIntro').style.display = '';
+    document.getElementById('placementRunning').style.display = 'none';
+    document.getElementById('placementResult').style.display = 'none';
+    showScreen('screen-placement');
+  });
+
+  // Test de placement
+  document.getElementById('btnStartPlacement').addEventListener('click', startPlacement);
+  document.getElementById('btnSkipPlacement').addEventListener('click', () => showMap());
+  document.getElementById('placementSubmit').addEventListener('click', placementSubmitAnswer);
+  document.getElementById('placementAnswer').addEventListener('keydown', e => { if (e.key === 'Enter') placementSubmitAnswer(); });
+  document.querySelectorAll('#placementKeypad button').forEach(b => {
+    b.addEventListener('click', () => {
+      buzzTap();
+      const k = b.dataset.key;
+      const inp = document.getElementById('placementAnswer');
+      if (k === 'back') inp.value = inp.value.slice(0, -1);
+      else if (k === '-') inp.value = inp.value.startsWith('-') ? inp.value.slice(1) : '-' + inp.value;
+      else if (k === ',') { if (!inp.value.includes(',')) inp.value += ','; }
+      else inp.value += k;
+    });
   });
 
   document.getElementById('btnAbout').addEventListener('click', () => {
@@ -1750,6 +1931,225 @@ function openImportModal() {
 }
 
 /* ============================================================
+   TEST DE PLACEMENT — mesure justesse + vitesse
+   ============================================================ */
+const placement = {
+  questions: [],   // [{ ex, drillKey, level }]
+  index: 0,
+  results: [],     // [{ status, elapsed, level, drillKey }]
+  startTime: 0,
+  zoneTimer: null,
+};
+
+function buildPlacementQuestions() {
+  // 10 questions de difficulté croissante, couvrant les astuces clés
+  const qs = [];
+  // 3 niveau "primaire"
+  qs.push({ gen: () => { const ex = gen_x10_simple(); ex.drillKey = 'x10'; return ex; }, level: 1 });
+  qs.push({ gen: () => { const ex = gen_compl10(); ex.drillKey = 'compl10'; return ex; }, level: 1 });
+  qs.push({ gen: () => { const ex = gen_x5(); ex.drillKey = 'x5'; return ex; }, level: 2 });
+  // 3 niveau "intermédiaire"
+  qs.push({ gen: () => { const ex = gen_compl100(); ex.drillKey = 'compl100'; return ex; }, level: 3 });
+  qs.push({ gen: () => { const ex = gen_x9(); ex.drillKey = 'x9'; return ex; }, level: 3 });
+  qs.push({ gen: () => { const ex = gen_x01(); ex.drillKey = 'x01'; return ex; }, level: 4 });
+  // 2 niveau "avancé"
+  qs.push({ gen: () => { const ex = gen_x25(); ex.drillKey = 'x25_50'; return ex; }, level: 5 });
+  qs.push({ gen: () => { const ex = gen_x11_simple(); ex.drillKey = 'x11'; return ex; }, level: 5 });
+  // 2 niveau "expert"
+  qs.push({ gen: () => { const ex = gen_carre_5(); ex.drillKey = 'carre5'; return ex; }, level: 7 });
+  qs.push({ gen: () => { const ex = gen_comp_mult(); ex.drillKey = 'compMult'; return ex; }, level: 8 });
+  return qs.map(q => ({ ex: q.gen(), drillKey: q.ex?.drillKey || 'x10', level: q.level, gen: q.gen }));
+}
+
+function startPlacement() {
+  document.getElementById('placementIntro').style.display = 'none';
+  document.getElementById('placementResult').style.display = 'none';
+  document.getElementById('placementRunning').style.display = '';
+  placement.questions = buildPlacementQuestions();
+  placement.index = 0;
+  placement.results = [];
+  placementNext();
+}
+
+let placementZoneRAF = null;
+function placementStartZone(drillKey) {
+  if (placementZoneRAF) cancelAnimationFrame(placementZoneRAF);
+  const t = thresholdFor(drillKey);
+  const max = t.ok * 1.5;
+  const bar = document.getElementById('placementZoneBar');
+  const mF = document.getElementById('placementZoneFast');
+  const mO = document.getElementById('placementZoneOk');
+  if (mF) mF.style.left = (t.fast / max * 100) + '%';
+  if (mO) mO.style.left = (t.ok / max * 100) + '%';
+  if (bar) bar.style.width = '0%';
+  const start = Date.now();
+  function tick() {
+    const elapsed = (Date.now() - start) / 1000;
+    if (bar) bar.style.width = Math.min(100, elapsed/max*100) + '%';
+    if (elapsed < max) placementZoneRAF = requestAnimationFrame(tick);
+  }
+  placementZoneRAF = requestAnimationFrame(tick);
+}
+
+function placementNext() {
+  if (placement.index >= placement.questions.length) {
+    return placementFinish();
+  }
+  const q = placement.questions[placement.index];
+  document.getElementById('placementTrick').textContent = q.ex.trick;
+  document.getElementById('placementQuestion').innerHTML = formatQuestion(q.ex.question);
+  document.getElementById('placementAnswer').value = '';
+  document.getElementById('placementCounter').textContent = `${placement.index + 1} / ${placement.questions.length}`;
+  document.getElementById('placementProgressFill').style.width = (placement.index / placement.questions.length * 100) + '%';
+  placement.startTime = Date.now();
+  placementStartZone(q.drillKey);
+}
+
+function placementSubmitAnswer() {
+  const q = placement.questions[placement.index];
+  if (!q) return;
+  const userInput = document.getElementById('placementAnswer').value;
+  const isGood = answerEquals(userInput, q.ex.answer);
+  const elapsed = (Date.now() - placement.startTime) / 1000;
+  if (placementZoneRAF) cancelAnimationFrame(placementZoneRAF);
+
+  const evalR = evaluateAnswer(isGood, elapsed, q.drillKey);
+  placement.results.push({
+    status: evalR.status, elapsed, level: q.level, drillKey: q.drillKey,
+    ex: q.ex, isGood,
+  });
+  // Enregistre la skill comme un exo classique
+  recordSkillStatus(state.current, q.drillKey, evalR.status, elapsed);
+
+  if (isGood) { sndGood(); buzzGood(); }
+  else { sndBad(); buzzBad(); }
+
+  placement.index++;
+  setTimeout(placementNext, 350);
+}
+
+function placementFinish() {
+  document.getElementById('placementRunning').style.display = 'none';
+  document.getElementById('placementResult').style.display = '';
+
+  // Analyse : on calcule le "niveau d'astuce" atteint
+  // Score basé sur MASTERED uniquement (vraie astuce)
+  const masteredLevels = placement.results.filter(r => r.status === 'MASTERED').map(r => r.level);
+  const correctLevels = placement.results.filter(r => r.status === 'CORRECT').map(r => r.level);
+  const slowLevels = placement.results.filter(r => r.status === 'SLOW').map(r => r.level);
+  const wrongLevels = placement.results.filter(r => r.status === 'WRONG').map(r => r.level);
+
+  // "Niveau d'astuce" = plus haut niveau atteint en MASTERED
+  const masterCeiling = masteredLevels.length > 0 ? Math.max(...masteredLevels) : 0;
+  const correctCeiling = correctLevels.length > 0 ? Math.max(...correctLevels) : 0;
+
+  const p = state.current;
+  // Pré-déverrouille les mondes selon le ceiling
+  // Niveau 1-2 : Monde 1 OK
+  // Niveau 3-4 : Mondes 1-2 marqués, accès Monde 3
+  // Niveau 5-6 : Mondes 1-3 marqués, accès Monde 4-5
+  // Niveau 7+ : Mondes 1-5 marqués, accès Monde 6+
+  let prefilled = 0;
+  if (masterCeiling >= 7) {
+    // Pré-marque Mondes 1-5 (zeros, compl, mult, decomp, comp) avec 2★
+    ['zeros', 'compl', 'mult', 'decomp', 'comp'].forEach(wid => {
+      const w = WORLDS.find(x => x.id === wid);
+      if (!w) return;
+      w.stages.forEach((stage, i) => {
+        if (stage.drill) return;
+        const k = `${w.id}_${i}`;
+        if (!p.stages[k] || (p.stages[k].stars || 0) < 2) {
+          p.stages[k] = { stars: 2, best: Math.floor(stage.count * 0.85), completed: true };
+          prefilled++;
+        }
+      });
+    });
+    // XP de départ
+    p.xp = Math.max(p.xp, 800);
+  } else if (masterCeiling >= 5) {
+    ['zeros', 'compl', 'mult'].forEach(wid => {
+      const w = WORLDS.find(x => x.id === wid);
+      if (!w) return;
+      w.stages.forEach((stage, i) => {
+        if (stage.drill) return;
+        const k = `${w.id}_${i}`;
+        if (!p.stages[k]) {
+          p.stages[k] = { stars: 2, best: Math.floor(stage.count * 0.8), completed: true };
+          prefilled++;
+        }
+      });
+    });
+    p.xp = Math.max(p.xp, 400);
+  } else if (masterCeiling >= 3) {
+    ['zeros', 'compl'].forEach(wid => {
+      const w = WORLDS.find(x => x.id === wid);
+      if (!w) return;
+      w.stages.forEach((stage, i) => {
+        if (stage.drill) return;
+        const k = `${w.id}_${i}`;
+        if (!p.stages[k]) {
+          p.stages[k] = { stars: 2, best: Math.floor(stage.count * 0.8), completed: true };
+          prefilled++;
+        }
+      });
+    });
+    p.xp = Math.max(p.xp, 150);
+  }
+  saveData();
+
+  // Affichage du résumé
+  const m = masteredLevels.length;
+  const c = correctLevels.length;
+  const sl = slowLevels.length;
+  const w = wrongLevels.length;
+
+  let verdict, recommendation;
+  if (masterCeiling >= 7) {
+    verdict = '🏆 Niveau Expert';
+    recommendation = 'Tu as déjà beaucoup d\'astuces intégrées ! On te place direct dans les mondes avancés. Tu peux toujours revenir en arrière.';
+  } else if (masterCeiling >= 5) {
+    verdict = '⭐ Niveau Confirmé';
+    recommendation = 'Tu maîtrises plusieurs astuces. On te place dans la zone intermédiaire pour ne pas t\'ennuyer.';
+  } else if (masterCeiling >= 3) {
+    verdict = '🌱 Niveau Débutant +';
+    recommendation = 'Tu commences à utiliser des astuces — on te place au début, mais avec quelques mondes déjà partiellement débloqués.';
+  } else if (correctCeiling >= 5) {
+    verdict = '🎓 Tu sais calculer mais sans astuces';
+    recommendation = 'Tu as les bons résultats mais en posant les calculs. L\'objectif : automatiser les astuces pour gagner en vitesse !';
+  } else {
+    verdict = '🌱 Apprenti';
+    recommendation = 'On commence depuis le début. À toi de devenir un as du calcul astucieux !';
+  }
+
+  const tableRows = placement.results.map((r, i) => `
+    <div class="placement-row">
+      <span class="prnum">${i+1}</span>
+      <span class="prq">${escapeHTML(r.ex.question)}</span>
+      <span class="prt">${r.elapsed.toFixed(1)}s</span>
+      <span class="prs prs-${r.status.toLowerCase()}">${r.status === 'MASTERED' ? '💎' : r.status === 'CORRECT' ? '✅' : r.status === 'SLOW' ? '🐢' : '❌'}</span>
+    </div>
+  `).join('');
+
+  document.getElementById('placementResult').innerHTML = `
+    <div style="text-align:center">
+      <div style="font-size:60px">${verdict.slice(0, 2)}</div>
+      <h2 style="margin:10px 0">${verdict.slice(2).trim()}</h2>
+    </div>
+    <div class="results-tricks">
+      <div class="rt rt-m"><b>${m}</b><span>💎 Réflexe</span></div>
+      <div class="rt rt-c"><b>${c}</b><span>✅ Bon</span></div>
+      <div class="rt rt-s"><b>${sl}</b><span>🐢 Lent</span></div>
+      <div class="rt rt-w"><b>${w}</b><span>❌ Faux</span></div>
+    </div>
+    <div class="placement-recommendation">${recommendation}</div>
+    ${prefilled > 0 ? `<div class="placement-prefilled">✨ <b>${prefilled} stages</b> pré-débloqués selon ton niveau !</div>` : ''}
+    <div class="placement-table">${tableRows}</div>
+    <button class="btn btn-primary" id="btnPlacementGoMap">▶️ Commencer l'aventure !</button>
+  `;
+  document.getElementById('btnPlacementGoMap').onclick = () => showMap();
+}
+
+/* ============================================================
    DUEL — partie 2 joueurs sur le même téléphone
    ============================================================ */
 const duel = {
@@ -1893,10 +2293,10 @@ function duelEnd() {
   arena.innerHTML = `
     <div class="duel-results-card">
       <div class="winner-emoji">${winner ? '🏆' : '🤝'}</div>
-      <h2>${winner ? `${winner.name} gagne !` : 'Égalité !'}</h2>
+      <h2>${winner ? `${escapeHTML(winner.name)} gagne !` : 'Égalité !'}</h2>
       <div style="margin:18px 0;font-size:16px;color:var(--text-soft)">
-        ${duel.p1.name} : <b style="color:var(--accent)">${duel.scores[0]}</b> &nbsp;·&nbsp;
-        ${duel.p2.name} : <b style="color:var(--accent)">${duel.scores[1]}</b>
+        ${escapeHTML(duel.p1.name)} : <b style="color:var(--accent)">${duel.scores[0]}</b> &nbsp;·&nbsp;
+        ${escapeHTML(duel.p2.name)} : <b style="color:var(--accent)">${duel.scores[1]}</b>
       </div>
       <p style="color:var(--text-soft);font-size:13px">+30 XP pour chaque joueur ${winner?'· +30 bonus pour le gagnant !':''}</p>
       <button class="btn btn-primary" id="duelReplay" style="margin-top:18px">⚔️ Revanche</button>

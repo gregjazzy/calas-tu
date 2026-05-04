@@ -209,6 +209,59 @@
   </div>
 </section>
 
+<!-- ============ ÉCRAN TEST DE PLACEMENT ============ -->
+<section id="screen-placement" class="screen">
+  <div class="bg-stars"></div>
+  <header class="topbar">
+    <h2>🎯 Test de placement</h2>
+  </header>
+  <div class="placement-intro" id="placementIntro">
+    <div style="font-size:80px;text-align:center">🎯</div>
+    <h3 style="text-align:center;margin:14px 0">Trouvons ton vrai niveau !</h3>
+    <p style="line-height:1.6;color:var(--text-soft);margin-bottom:14px">
+      <b>10 questions</b> pour évaluer non seulement si tu trouves le bon résultat,
+      mais surtout si tu utilises les <b>astuces de calcul</b>.
+    </p>
+    <p style="line-height:1.6;color:var(--text-soft);margin-bottom:14px">
+      💎 = Tu réponds vite → l'astuce est intégrée<br>
+      ✅ = Tu réponds correct mais lent → tu n'as pas pris le raccourci<br>
+      🐢 = Tu poses le calcul mentalement → l'astuce est à apprendre<br>
+      ❌ = Faux → on te montre la méthode
+    </p>
+    <p style="line-height:1.6;color:var(--accent);font-weight:700">Vas le plus vite possible !</p>
+    <button class="btn btn-primary" id="btnStartPlacement" style="margin-top:14px">▶️ Commencer le test</button>
+    <button class="btn btn-secondary" id="btnSkipPlacement" style="margin-top:8px">Sauter (commencer du début)</button>
+  </div>
+  <div class="placement-running" id="placementRunning" style="display:none">
+    <!-- contenu copié de l'exercice -->
+    <div class="ex-progress" style="margin-bottom:14px">
+      <div class="ex-progress-bar"><div class="ex-progress-fill" id="placementProgressFill"></div></div>
+      <div class="ex-counter" id="placementCounter">1 / 10</div>
+    </div>
+    <div class="trick-zone">
+      <div class="trick-zone-bar" id="placementZoneBar"></div>
+      <div class="trick-zone-marker" id="placementZoneFast"></div>
+      <div class="trick-zone-marker" id="placementZoneOk"></div>
+    </div>
+    <div class="exercise-card">
+      <div class="ex-trick" id="placementTrick"></div>
+      <div class="ex-question" id="placementQuestion"></div>
+      <div class="ex-answer-zone">
+        <input type="text" id="placementAnswer" inputmode="decimal" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="?" enterkeyhint="send" readonly onfocus="this.removeAttribute('readonly')" />
+        <button class="btn btn-primary" id="placementSubmit">Valider</button>
+      </div>
+      <div class="ex-keypad" id="placementKeypad">
+        <button data-key="1">1</button><button data-key="2">2</button><button data-key="3">3</button>
+        <button data-key="4">4</button><button data-key="5">5</button><button data-key="6">6</button>
+        <button data-key="7">7</button><button data-key="8">8</button><button data-key="9">9</button>
+        <button data-key="-">−</button><button data-key="0">0</button><button data-key=",">,</button>
+        <button class="key-back" data-key="back">⌫</button>
+      </div>
+    </div>
+  </div>
+  <div class="placement-result" id="placementResult" style="display:none"></div>
+</section>
+
 <!-- ============ ÉCRAN CARTE DES MONDES ============ -->
 <section id="screen-map" class="screen">
   <div class="bg-stars"></div>
@@ -365,6 +418,13 @@
     <div class="ex-timer-bar" id="exTimerBar"></div>
   </div>
 
+  <!-- Barre "zone d'astuce" : verte → jaune → rouge selon le temps -->
+  <div class="trick-zone" id="trickZone">
+    <div class="trick-zone-bar" id="trickZoneBar"></div>
+    <div class="trick-zone-marker" id="trickZoneMarkerFast" style="left:0%"></div>
+    <div class="trick-zone-marker" id="trickZoneMarkerOk" style="left:0%"></div>
+  </div>
+
   <div class="exercise-card" id="exerciseCard">
     <div class="ex-trick" id="exTrick"></div>
     <div class="ex-question" id="exQuestion"></div>
@@ -415,6 +475,7 @@
       <div class="stat"><b id="resBest">0</b><span>Meilleur</span></div>
     </div>
     <div class="results-stars" id="resStars"></div>
+    <div class="results-tricks" id="resTricks"></div>
     <div class="results-badges" id="resBadges"></div>
     <div class="results-actions">
       <button class="btn btn-secondary" id="btnReplay">Rejouer</button>

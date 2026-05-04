@@ -1262,6 +1262,72 @@ function nextRank(level) {
   return null;
 }
 
+/* ===== Seuils de temps par astuce =====
+   timeFast  : <= ce temps → l'astuce a été utilisée (réflexe)  → 💎 MAÎTRISÉ
+   timeOk    : entre fast et ok → bon mais sans l'astuce         → ✅ CORRECT
+   au-delà   : calcul brut                                       → 🐢 LENT
+   Le seuil est ATTACHÉ AU GÉNÉRATEUR (drillKey ou nom de stage). */
+const TIME_THRESHOLDS = {
+  // Monde Zéros
+  x10:        { fast: 2.0, ok: 4.0, label: 'Déplacer la virgule' },
+  x10dec:     { fast: 2.5, ok: 5.0, label: 'Déplacer la virgule (décimal)' },
+  div10:      { fast: 2.0, ok: 4.0, label: 'Déplacer la virgule à gauche' },
+  x01:        { fast: 2.5, ok: 5.0, label: '×0,1 = ÷10' },
+  div01:      { fast: 2.5, ok: 5.0, label: '÷0,1 = ×10' },
+  // Compléments
+  compl10:    { fast: 1.8, ok: 3.5, label: 'Complément à 10' },
+  compl100:   { fast: 3.0, ok: 6.0, label: 'Complément à 100' },
+  complRound: { fast: 2.5, ok: 5.0, label: 'Complément à la dizaine' },
+  compl1000:  { fast: 4.0, ok: 8.0, label: 'Complément à 1000' },
+  complDec:   { fast: 2.5, ok: 5.0, label: 'Complément à 1' },
+  // Multiplications astucieuses
+  x5:         { fast: 4.0, ok: 7.0, label: '×5 = ×10÷2' },
+  x9:         { fast: 4.0, ok: 8.0, label: '×9 = ×10−n' },
+  x11:        { fast: 4.0, ok: 9.0, label: '×11 (truc des 2 chiffres)' },
+  x25_50:     { fast: 4.5, ok: 9.0, label: '×25 ou ×50' },
+  x4_8:       { fast: 4.0, ok: 8.0, label: 'Doublage en série' },
+  // Décomposition
+  addDecomp:  { fast: 4.0, ok: 8.0, label: 'Décomposition addition' },
+  subDecomp:  { fast: 4.5, ok: 9.0, label: 'Décomposition soustraction' },
+  friends:    { fast: 5.0, ok: 10.0, label: 'Repérer les amis (100)' },
+  // Compensation
+  compMult:   { fast: 5.0, ok: 10.0, label: 'Compensation multiplication' },
+  compSub:    { fast: 4.5, ok: 9.0, label: 'Soustraction équivalente' },
+  // Distributivité
+  distSimple: { fast: 5.0, ok: 10.0, label: 'Distributivité' },
+  distMed:    { fast: 6.0, ok: 12.0, label: 'Distributivité +' },
+  distFactor: { fast: 6.0, ok: 12.0, label: 'Factorisation' },
+  // Carrés
+  carre5:     { fast: 4.0, ok: 8.0, label: 'Carré en 5' },
+  carreSimple:{ fast: 7.0, ok: 14.0, label: 'Carré décomposé' },
+  carre100:   { fast: 6.0, ok: 12.0, label: 'Carré près de 100' },
+  // Problèmes (lecture lente, on est tolérants)
+  pbAdd:      { fast: 7.0, ok: 14.0, label: 'Problème addition' },
+  pbSub:      { fast: 7.0, ok: 14.0, label: 'Problème soustraction' },
+  pbMult:     { fast: 8.0, ok: 16.0, label: 'Problème multiplication' },
+  pbDiv:      { fast: 7.0, ok: 14.0, label: 'Problème partage' },
+  pbPct:      { fast: 8.0, ok: 16.0, label: 'Problème pourcentage' },
+  // Fallback générique
+  _default:   { fast: 6.0, ok: 12.0, label: 'Calcul mental' },
+};
+
+function thresholdFor(drillKey) {
+  return TIME_THRESHOLDS[drillKey] || TIME_THRESHOLDS._default;
+}
+
+/* Évalue une réponse : renvoie le statut + le seuil utilisé */
+function evaluateAnswer(isCorrect, elapsedSec, drillKey) {
+  if (!isCorrect) return { status: 'WRONG', emoji: '❌', label: 'Faux', threshold: thresholdFor(drillKey) };
+  const t = thresholdFor(drillKey);
+  if (elapsedSec <= t.fast) return { status: 'MASTERED', emoji: '💎', label: 'Réflexe astuce', threshold: t };
+  if (elapsedSec <= t.ok)   return { status: 'CORRECT',  emoji: '✅', label: 'Bon mais lent', threshold: t };
+  return                          { status: 'SLOW',     emoji: '🐢', label: 'Calcul brut', threshold: t };
+}
+
+window.TIME_THRESHOLDS = TIME_THRESHOLDS;
+window.thresholdFor = thresholdFor;
+window.evaluateAnswer = evaluateAnswer;
+
 /* ===== Accessoires d'avatar débloqués selon le niveau ===== */
 const AVATAR_ACCESSORIES = [
   { level: 1,  emoji: '',     name: 'Débutant' },
