@@ -1,5 +1,5 @@
 /* Calastu — Service Worker (offline-first) */
-const CACHE = 'calastu-v5';
+const CACHE = 'calastu-v6';
 
 self.addEventListener('message', (e) => {
   if (e.data && e.data.type === 'SKIP_WAITING') self.skipWaiting();
