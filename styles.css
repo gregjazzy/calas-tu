@@ -819,10 +819,19 @@ input { font-family: inherit; }
   font-size: 22px;
   font-weight: 700;
   border: 1px solid var(--border);
-  transition: transform 0.08s, background 0.1s;
+  /* Pas de transition sur tap (latence perçue). Animation seulement à la fin. */
+  transition: background 0.05s ease-out;
   touch-action: manipulation;
+  will-change: transform;
+  -webkit-tap-highlight-color: transparent;
 }
-.ex-keypad button:active { transform: scale(0.93); background: var(--accent); color: #1a0b3d; }
+.ex-keypad button.tapped {
+  background: var(--accent);
+  color: #1a0b3d;
+  transform: scale(0.93);
+  transition: none;
+}
+.ex-keypad button:active { background: var(--accent); color: #1a0b3d; }
 .ex-keypad .key-back { background: rgba(239, 71, 111, 0.18); }
 
 /* ===== Feedback overlay ===== */

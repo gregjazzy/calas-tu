@@ -506,11 +506,19 @@ function sndBad()  { tone(220, 0.18, 'square', 0.12); setTimeout(()=>tone(160, 0
 function sndStreak(){ tone(800, 0.06); setTimeout(()=>tone(1000, 0.06), 50); setTimeout(()=>tone(1200, 0.1), 100); }
 function sndLevel() { [600,800,1000,1200].forEach((f,i)=>setTimeout(()=>tone(f, 0.12, 'triangle'), i*70)); }
 
-/* ---------- Vibration tactile (Vibration API) ---------- */
+/* ---------- Vibration tactile (Vibration API)
+   IMPORTANT : navigator.vibrate peut être synchrone et bloquer 30-80ms
+   sur certains Android. On le différe TOUJOURS via requestIdleCallback
+   ou setTimeout pour ne PAS bloquer la saisie clavier (vitesse > tactile). */
+const _hasIdle = typeof requestIdleCallback === 'function';
 function buzz(pattern) {
-  try { if (navigator.vibrate) navigator.vibrate(pattern); } catch(e) {}
+  const trigger = () => {
+    try { if (navigator.vibrate) navigator.vibrate(pattern); } catch(e) {}
+  };
+  if (_hasIdle) requestIdleCallback(trigger, { timeout: 50 });
+  else setTimeout(trigger, 0);
 }
-function buzzTap()    { buzz(8); }
+function buzzTap()    { buzz(5); }   // raccourci à 5ms (à peine perceptible mais ressenti)
 function buzzGood()   { buzz(20); }
 function buzzBad()    { buzz([60, 40, 60]); }
 function buzzCombo()  { buzz([15, 30, 15, 30, 15]); }
@@ -1805,28 +1813,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btnSkipPlacement').addEventListener('click', () => showMap());
   document.getElementById('placementSubmit').addEventListener('click', placementSubmitAnswer);
   document.getElementById('placementAnswer').addEventListener('keydown', e => { if (e.key === 'Enter') placementSubmitAnswer(); });
-  function handlePlacementInput(b) {
-    buzzTap();
-    const k = b.dataset.key;
-    const inp = document.getElementById('placementAnswer');
-    if (!inp) return;
-    if (k === 'back') inp.value = inp.value.slice(0, -1);
-    else if (k === '-') inp.value = inp.value.startsWith('-') ? inp.value.slice(1) : '-' + inp.value;
-    else if (k === ',') { if (!inp.value.includes(',')) inp.value += ','; }
-    else inp.value += k;
-  }
-  document.querySelectorAll('#placementKeypad button').forEach(b => {
-    let handled = false;
-    b.addEventListener('pointerdown', (e) => {
-      e.preventDefault();
-      handled = true;
-      handlePlacementInput(b);
-    });
-    b.addEventListener('click', () => {
-      if (handled) { handled = false; return; }
-      handlePlacementInput(b);
-    });
-  });
+  // Le keypad du placement est déjà bind via bindFastKeypad plus haut.
 
   document.getElementById('btnAbout').addEventListener('click', () => {
     document.getElementById('modalAbout').classList.add('show');
@@ -1873,31 +1860,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btnStartDuel').addEventListener('click', startDuel);
   document.getElementById('duelSubmit').addEventListener('click', () => duelSubmit());
   document.getElementById('duelAnswer').addEventListener('keydown', e => { if (e.key === 'Enter') duelSubmit(); });
-  function handleDuelInput(b) {
-    buzzTap();
-    const k = b.dataset.key;
-    const inp = document.getElementById('duelAnswer');
-    if (!inp) return;
-    if (k === 'back') inp.value = inp.value.slice(0, -1);
-    else if (k === '-') {
-      if (inp.value.startsWith('-')) inp.value = inp.value.slice(1);
-      else inp.value = '-' + inp.value;
-    }
-    else if (k === ',') { if (!inp.value.includes(',')) inp.value += ','; }
-    else inp.value += k;
-  }
-  document.querySelectorAll('#duelKeypad button').forEach(b => {
-    let handled = false;
-    b.addEventListener('pointerdown', (e) => {
-      e.preventDefault();
-      handled = true;
-      handleDuelInput(b);
-    });
-    b.addEventListener('click', () => {
-      if (handled) { handled = false; return; }
-      handleDuelInput(b);
-    });
-  });
+  bindFastKeypad('#duelKeypad button', 'duelAnswer');
   document.getElementById('duelQuit').addEventListener('click', () => {
     if (confirm('Quitter le duel ?')) {
       if (duel.timer) clearTimeout(duel.timer);
@@ -1946,15 +1909,14 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.key === 'Enter') submitAnswer();
   });
 
-  // Keypad — utilise pointerdown + preventDefault pour éviter le double-firing
-  // (sur Android Chrome, click est parfois doublé après touchend)
-  function handleKeypadInput(b) {
-    buzzTap();
-    const k = b.dataset.key;
-    const inp = b.closest('#placementKeypad')
-      ? document.getElementById('placementAnswer')
-      : document.getElementById('exAnswer');
+  // Keypad — chemin de saisie ULTRA RAPIDE
+  // 1. Mise à jour du texte : synchrone, immédiate (priorité absolue)
+  // 2. Vibration & animation : différées (ne doivent JAMAIS bloquer la frappe)
+  function fastKeyPress(b, inputId) {
+    const inp = document.getElementById(inputId);
     if (!inp) return;
+    const k = b.dataset.key;
+    // Mise à jour synchrone du texte — c'est tout ce qui doit se passer en priorité
     if (k === 'back') inp.value = inp.value.slice(0, -1);
     else if (k === '-') {
       if (inp.value.startsWith('-')) inp.value = inp.value.slice(1);
@@ -1963,20 +1925,31 @@ document.addEventListener('DOMContentLoaded', () => {
     else if (k === ',') { if (!inp.value.includes(',')) inp.value += ','; }
     else if (k === '/') { if (!inp.value.includes('/')) inp.value += '/'; }
     else inp.value += k;
+    // Animation visuelle + vibration : différées, n'impactent pas la frappe
+    b.classList.add('tapped');
+    requestAnimationFrame(() => {
+      setTimeout(() => b.classList.remove('tapped'), 80);
+    });
+    buzzTap(); // déjà différé via requestIdleCallback
   }
-  document.querySelectorAll('.ex-keypad button').forEach(b => {
-    let handled = false;
-    b.addEventListener('pointerdown', (e) => {
-      e.preventDefault();
-      handled = true;
-      handleKeypadInput(b);
+  function bindFastKeypad(selector, inputId) {
+    document.querySelectorAll(selector).forEach(b => {
+      let handled = false;
+      // pointerdown = se déclenche AU TOUCHER, sans attendre touchend → 0 latence
+      b.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        handled = true;
+        fastKeyPress(b, inputId);
+      }, { passive: false });
+      b.addEventListener('click', (e) => {
+        if (handled) { handled = false; return; }
+        fastKeyPress(b, inputId);
+      });
     });
-    b.addEventListener('click', (e) => {
-      // Si pointerdown a déjà géré, on ignore le click (qui peut suivre)
-      if (handled) { handled = false; return; }
-      handleKeypadInput(b);
-    });
-  });
+  }
+  // Bind les 3 keypads (sélecteur précis pour chacun pour éviter mélanges)
+  bindFastKeypad('#exKeypad button', 'exAnswer');
+  bindFastKeypad('#placementKeypad button', 'placementAnswer');
 
   // Next after feedback
   document.getElementById('btnNext').addEventListener('click', nextAfterFeedback);
