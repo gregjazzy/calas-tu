@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<title>Calastu — Générer les icônes</title>
+<style>
+  body { font-family: -apple-system, sans-serif; padding: 30px; background: #1a0b3d; color: #fff; line-height: 1.6; }
+  h1 { color: #ffd166; }
+  .preview { display: flex; gap: 20px; flex-wrap: wrap; margin: 20px 0; }
+  .preview > div { background: #2d1b5e; padding: 14px; border-radius: 14px; text-align: center; }
+  canvas { border-radius: 18px; display: block; margin-bottom: 8px; }
+  button { background: linear-gradient(135deg,#ffd166,#ff6b9d); color: #1a0b3d; border: 0; padding: 14px 24px; border-radius: 10px; font-weight: 800; font-size: 16px; cursor: pointer; margin: 8px 8px 8px 0; }
+  ol { padding-left: 22px; }
+  code { background: rgba(0,0,0,0.4); padding: 2px 8px; border-radius: 4px; color: #ffd166; }
+</style>
+</head>
+<body>
+
+<h1>🎨 Générer les icônes PNG</h1>
+<p>Cette page lit <code>icon.svg</code> et génère les 3 PNG nécessaires pour la PWA.</p>
+
+<ol>
+  <li>Clique sur <b>"Générer & télécharger"</b> ci-dessous.</li>
+  <li>3 fichiers sont téléchargés : <code>icon-192.png</code>, <code>icon-512.png</code>, <code>icon-maskable.png</code>.</li>
+  <li>Place-les <b>dans le dossier Calastu</b> (à côté de <code>index.html</code>).</li>
+  <li>C'est tout, tu peux fermer cet outil.</li>
+</ol>
+
+<button id="btnGen">⚡ Générer & télécharger</button>
+
+<div class="preview">
+  <div><canvas id="c192" width="192" height="192"></canvas><br>icon-192.png</div>
+  <div><canvas id="c512" width="512" height="512" style="width:200px;height:200px"></canvas><br>icon-512.png</div>
+  <div><canvas id="cmask" width="512" height="512" style="width:200px;height:200px"></canvas><br>icon-maskable.png<br><small style="opacity:0.7">(zone safe centrale)</small></div>
+</div>
+
+<p style="margin-top: 20px; opacity: 0.8; font-size: 14px;">
+  Si tu vois "Erreur" : ouvre cette page <b>via un serveur local</b> (voir README), pas en double-cliquant.
+</p>
+
+<script>
+async function loadSVG() {
+  const res = await fetch('icon.svg');
+  if (!res.ok) throw new Error('Impossible de charger icon.svg (utilise un serveur local)');
+  return await res.text();
+}
+
+function drawSVGtoCanvas(svgText, canvas, scale = 1) {
+  return new Promise((resolve, reject) => {
+    const blob = new Blob([svgText], { type: 'image/svg+xml' });
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    img.onload = () => {
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      resolve();
+    };
+    img.onerror = (e) => { URL.revokeObjectURL(url); reject(e); };
+    img.src = url;
+  });
+}
+
+function downloadCanvas(canvas, filename) {
+  canvas.toBlob(blob => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }, 'image/png');
+}
+
+document.getElementById('btnGen').addEventListener('click', async () => {
+  try {
+    const svg = await loadSVG();
+    const c192 = document.getElementById('c192');
+    const c512 = document.getElementById('c512');
+    const cmask = document.getElementById('cmask');
+
+    await drawSVGtoCanvas(svg, c192);
+    await drawSVGtoCanvas(svg, c512);
+
+    // Maskable : zone safe au centre (80% de l'icône, fond plein bord à bord)
+    const mctx = cmask.getContext('2d');
+    mctx.fillStyle = '#1a0b3d';
+    mctx.fillRect(0, 0, 512, 512);
+    const imgBlob = new Blob([svg], { type: 'image/svg+xml' });
+    const url = URL.createObjectURL(imgBlob);
+    const img = new Image();
+    await new Promise((res, rej) => {
+      img.onload = res; img.onerror = rej; img.src = url;
+    });
+    // dessine 80% au centre
+    const safe = 410;
+    const off = (512 - safe) / 2;
+    mctx.drawImage(img, off, off, safe, safe);
+    URL.revokeObjectURL(url);
+
+    downloadCanvas(c192, 'icon-192.png');
+    setTimeout(() => downloadCanvas(c512, 'icon-512.png'), 250);
+    setTimeout(() => downloadCanvas(cmask, 'icon-maskable.png'), 500);
+  } catch (e) {
+    alert('Erreur : ' + e.message);
+  }
+});
+
+// Aperçu auto
+(async () => {
+  try {
+    const svg = await loadSVG();
+    await drawSVGtoCanvas(svg, document.getElementById('c192'));
+    await drawSVGtoCanvas(svg, document.getElementById('c512'));
+    const cmask = document.getElementById('cmask');
+    const mctx = cmask.getContext('2d');
+    mctx.fillStyle = '#1a0b3d';
+    mctx.fillRect(0, 0, 512, 512);
+    const imgBlob = new Blob([svg], { type: 'image/svg+xml' });
+    const url = URL.createObjectURL(imgBlob);
+    const img = new Image();
+    await new Promise((res) => { img.onload = res; img.src = url; });
+    const safe = 410;
+    const off = (512 - safe) / 2;
+    mctx.drawImage(img, off, off, safe, safe);
+    URL.revokeObjectURL(url);
+  } catch(e) {
+    document.querySelectorAll('canvas').forEach(c => {
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#444'; ctx.fillRect(0,0,c.width,c.height);
+      ctx.fillStyle = '#fff'; ctx.font = '20px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText('Lance via serveur', c.width/2, c.height/2);
+    });
+  }
+})();
+</script>
+</body>
+</html>

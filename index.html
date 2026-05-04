@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content" />
+<meta name="format-detection" content="telephone=no" />
+<meta name="HandheldFriendly" content="true" />
+<meta name="theme-color" content="#1a0b3d" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Calastu" />
+<meta name="mobile-web-app-capable" content="yes" />
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" type="image/svg+xml" href="icon.svg" />
+<link rel="apple-touch-icon" href="icon-192.png" />
+<title>Calastu — As du Calcul</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<!-- ============ ÉCRAN PROFILS ============ -->
+<section id="screen-profiles" class="screen active">
+  <div class="bg-stars"></div>
+  <header class="hero">
+    <h1 class="logo">Cal<span>astu</span></h1>
+    <p class="tagline">L'académie des as du calcul mental</p>
+  </header>
+
+  <div class="profiles-list" id="profilesList"></div>
+
+  <button class="btn btn-primary" id="btnNewProfile">+ Nouveau joueur</button>
+  <button class="btn btn-secondary" id="btnImport" style="margin-top:10px">📥 Importer une sauvegarde</button>
+  <button class="btn btn-parent" id="btnParentMode" style="margin-top:10px">👨‍👩‍👧 Espace parent</button>
+
+  <div class="footer-mini">
+    <button class="link-mini" id="btnAbout">Comment ça marche ?</button>
+  </div>
+</section>
+
+<!-- ============ ÉCRAN DUEL — choix des joueurs ============ -->
+<section id="screen-duel-setup" class="screen">
+  <div class="bg-stars"></div>
+  <header class="topbar">
+    <button class="btn-back" data-target="screen-map">←</button>
+    <h2>⚔️ Duel à 2</h2>
+  </header>
+  <div class="duel-setup">
+    <p class="duel-intro">Chacun son tour, sur le même téléphone. Le plus rapide et le plus précis gagne !</p>
+    <div class="duel-players">
+      <div class="duel-player">
+        <h3>Joueur 1</h3>
+        <select id="duelP1" class="duel-select"></select>
+      </div>
+      <div class="duel-vs">VS</div>
+      <div class="duel-player">
+        <h3>Joueur 2</h3>
+        <select id="duelP2" class="duel-select"></select>
+      </div>
+    </div>
+    <label>Nombre de manches :</label>
+    <div class="duel-rounds">
+      <button data-rounds="6" class="sel">6</button>
+      <button data-rounds="10">10</button>
+      <button data-rounds="14">14</button>
+    </div>
+    <label>Difficulté :</label>
+    <div class="duel-diff">
+      <button data-diff="easy">Facile</button>
+      <button data-diff="med" class="sel">Moyen</button>
+      <button data-diff="hard">Difficile</button>
+    </div>
+    <button class="btn btn-primary" id="btnStartDuel">⚔️ Commencer le duel !</button>
+  </div>
+</section>
+
+<!-- ============ ÉCRAN DUEL — partie ============ -->
+<section id="screen-duel-play" class="screen">
+  <div class="duel-arena">
+    <div class="duel-scoreboard">
+      <div class="duel-side" id="duelSide1">
+        <div class="duel-avatar" id="duelAv1"></div>
+        <div class="duel-name" id="duelName1"></div>
+        <div class="duel-score" id="duelScore1">0</div>
+      </div>
+      <div class="duel-vs-score">vs</div>
+      <div class="duel-side" id="duelSide2">
+        <div class="duel-avatar" id="duelAv2"></div>
+        <div class="duel-name" id="duelName2"></div>
+        <div class="duel-score" id="duelScore2">0</div>
+      </div>
+    </div>
+
+    <div class="duel-turn-banner" id="duelTurnBanner">
+      <span id="duelTurnText">À toi de jouer !</span>
+    </div>
+
+    <div class="duel-progress" id="duelProgress">Manche 1 / 6</div>
+
+    <div class="duel-card" id="duelCard">
+      <div class="ex-trick" id="duelTrick"></div>
+      <div class="ex-question" id="duelQuestion"></div>
+      <div class="duel-timer-wrap"><div class="duel-timer-bar" id="duelTimerBar"></div></div>
+      <div class="ex-answer-zone">
+        <input type="text" id="duelAnswer" inputmode="decimal" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="?" enterkeyhint="send" readonly onfocus="this.removeAttribute('readonly')" />
+        <button class="btn btn-primary" id="duelSubmit">Valider</button>
+      </div>
+      <div class="ex-keypad" id="duelKeypad">
+        <button data-key="1">1</button><button data-key="2">2</button><button data-key="3">3</button>
+        <button data-key="4">4</button><button data-key="5">5</button><button data-key="6">6</button>
+        <button data-key="7">7</button><button data-key="8">8</button><button data-key="9">9</button>
+        <button data-key="-">−</button><button data-key="0">0</button><button data-key=",">,</button>
+        <button class="key-back" data-key="back">⌫</button>
+      </div>
+    </div>
+
+    <button class="btn btn-secondary" id="duelQuit" style="margin-top:14px">Quitter le duel</button>
+  </div>
+</section>
+
+<!-- ============ ÉCRAN ESPACE PARENT — code PIN ============ -->
+<section id="screen-parent-pin" class="screen">
+  <div class="bg-stars"></div>
+  <header class="topbar">
+    <button class="btn-back" data-target="screen-profiles">←</button>
+    <h2>👨‍👩‍👧 Espace parent</h2>
+  </header>
+  <div class="form-card">
+    <div style="text-align:center;font-size:60px;margin-bottom:14px">🔐</div>
+    <p id="pinPrompt">Crée un code PIN à 4 chiffres pour protéger l'espace parent.</p>
+    <div class="pin-input-wrap">
+      <input type="password" inputmode="numeric" maxlength="4" id="pinInput" class="pin-input" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" pattern="[0-9]*" />
+    </div>
+    <button class="btn btn-primary" id="btnPinSubmit">Valider</button>
+    <button class="link-mini" id="btnPinReset" style="margin-top:8px;display:none">Oublié ? Réinitialiser</button>
+  </div>
+</section>
+
+<!-- ============ ÉCRAN ESPACE PARENT — dashboard ============ -->
+<section id="screen-parent-dash" class="screen">
+  <div class="bg-stars"></div>
+  <header class="topbar">
+    <button class="btn-back" data-target="screen-profiles">←</button>
+    <h2>📊 Tableau de bord</h2>
+  </header>
+  <div id="parentDashboard"></div>
+</section>
+
+<!-- ============ ÉCRAN WRAPPED — bilan du mois ============ -->
+<section id="screen-wrapped" class="screen">
+  <div class="bg-stars"></div>
+  <header class="topbar">
+    <button class="btn-back" data-target="screen-map">←</button>
+    <h2>🎁 Mon Mois</h2>
+  </header>
+  <div id="wrappedContent"></div>
+</section>
+
+<!-- ============ MODAL EXPORT/IMPORT ============ -->
+<div class="modal" id="modalBackup">
+  <div class="modal-card">
+    <h2 id="backupTitle">💾 Sauvegarde</h2>
+    <p id="backupIntro">Sauvegarde la progression de ce profil pour la restaurer plus tard ou sur un autre appareil.</p>
+
+    <div id="backupExportBlock">
+      <button class="btn btn-primary" id="btnDownloadBackup">⬇️ Télécharger le fichier</button>
+      <p style="margin:14px 0 6px;font-size:13px;color:var(--text-soft)">Ou copie ce code :</p>
+      <textarea id="backupCode" readonly style="width:100%;height:90px;padding:10px;border-radius:10px;border:1px solid var(--border);background:rgba(0,0,0,0.3);color:var(--accent);font-family:monospace;font-size:11px;resize:none"></textarea>
+      <button class="btn btn-secondary" id="btnCopyCode" style="margin-top:8px">📋 Copier le code</button>
+    </div>
+
+    <div id="backupImportBlock" style="display:none">
+      <button class="btn btn-primary" id="btnUploadFile">📂 Choisir un fichier .calastu</button>
+      <input type="file" id="fileInput" accept=".calastu,.json,application/json" style="display:none" />
+      <p style="margin:14px 0 6px;font-size:13px;color:var(--text-soft)">Ou colle un code :</p>
+      <textarea id="importCode" placeholder="Colle ici le code de sauvegarde..." style="width:100%;height:90px;padding:10px;border-radius:10px;border:1px solid var(--border);background:rgba(0,0,0,0.3);color:var(--accent);font-family:monospace;font-size:11px;resize:none"></textarea>
+      <button class="btn btn-secondary" id="btnPasteImport" style="margin-top:8px">✅ Importer le code</button>
+    </div>
+
+    <button class="btn btn-secondary" id="btnBackupClose" style="margin-top:14px">Fermer</button>
+  </div>
+</div>
+
+<!-- ============ ÉCRAN CRÉATION PROFIL ============ -->
+<section id="screen-newprofile" class="screen">
+  <div class="bg-stars"></div>
+  <header class="topbar">
+    <button class="btn-back" data-target="screen-profiles">←</button>
+    <h2>Nouveau joueur</h2>
+  </header>
+
+  <div class="form-card">
+    <label>Ton prénom :</label>
+    <input type="text" id="newName" maxlength="14" placeholder="Ex: Lucas" autocorrect="off" autocapitalize="words" spellcheck="false" />
+
+    <label>Choisis ton avatar :</label>
+    <div class="avatar-picker" id="avatarPicker"></div>
+
+    <label>Ta classe :</label>
+    <div class="class-picker" id="classPicker">
+      <button data-class="CE2">CE2</button>
+      <button data-class="CM1">CM1</button>
+      <button data-class="CM2">CM2</button>
+      <button data-class="6e">6ème</button>
+      <button data-class="5e">5ème</button>
+      <button data-class="4e">4ème</button>
+    </div>
+
+    <button class="btn btn-primary" id="btnCreateProfile">Commencer l'aventure</button>
+  </div>
+</section>
+
+<!-- ============ ÉCRAN CARTE DES MONDES ============ -->
+<section id="screen-map" class="screen">
+  <div class="bg-stars"></div>
+  <header class="topbar">
+    <button class="btn-back" data-target="screen-profiles">←</button>
+    <div class="player-info">
+      <span class="player-avatar" id="playerAvatar"></span>
+      <div>
+        <div class="player-name" id="playerName"></div>
+        <div class="player-level">
+          <span class="lvl">Niv. <b id="playerLevel">1</b></span>
+          <div class="xp-bar"><div class="xp-fill" id="xpFill"></div></div>
+          <span class="xp-text" id="xpText">0 / 100 XP</span>
+        </div>
+      </div>
+    </div>
+    <button class="btn-icon" id="btnExport" title="Sauvegarder">💾</button>
+    <button class="btn-icon" id="btnTrophies" title="Trophées">🏆</button>
+  </header>
+
+  <div class="daily-streak-card" id="dailyStreakCard">
+    <div class="flame">🔥</div>
+    <div class="streak-info">
+      <b id="streakDays">0 jour</b>
+      <span id="streakSubtitle">Joue chaque jour pour grimper !</span>
+    </div>
+  </div>
+
+  <!-- Bouton magique "Continuer" : lance la meilleure activité du moment -->
+  <button class="btn-continue" id="btnContinue">
+    <div class="continue-icon" id="continueIcon">▶️</div>
+    <div class="continue-text">
+      <div class="continue-action" id="continueAction">Commencer l'aventure</div>
+      <div class="continue-hint" id="continueHint">Le coach Calastu te guide</div>
+    </div>
+    <div class="continue-arrow">→</div>
+  </button>
+
+  <!-- Plan du jour (checklist guidée) -->
+  <div class="day-plan" id="dayPlan">
+    <div class="day-plan-header">
+      <span>📋 Ton plan du jour</span>
+      <span class="day-plan-progress" id="dayPlanProgress">0/3</span>
+    </div>
+    <div class="day-plan-list" id="dayPlanList"></div>
+  </div>
+
+  <!-- Avertissement révision obligatoire -->
+  <div class="review-block" id="reviewBlock" style="display:none">
+    <div class="review-block-icon">🔒</div>
+    <div class="review-block-text">
+      <b>Révision d'abord !</b>
+      <span id="reviewBlockMsg">Tu as <b>5</b> astuces à réviser. Fais-les avant de continuer — c'est ce qui rend les méthodes solides !</span>
+    </div>
+    <button class="btn btn-primary" id="btnDoReview">🔁 Réviser maintenant</button>
+  </div>
+
+  <div class="game-modes">
+    <button class="mode-btn" data-mode="daily">
+      <div class="mode-icon">⚡</div>
+      <div class="mode-text">
+        <b>Défi du jour</b>
+        <span>10 exos chrono · Bonus XP</span>
+      </div>
+    </button>
+    <button class="mode-btn" data-mode="survival">
+      <div class="mode-icon">💀</div>
+      <div class="mode-text">
+        <b>Mode Survie</b>
+        <span>3 vies. Combien tu tiens ?</span>
+      </div>
+    </button>
+    <button class="mode-btn mode-review" data-mode="review">
+      <div class="mode-icon">🔁</div>
+      <div class="mode-text">
+        <b>Révision Intelligente</b>
+        <span id="reviewBadge">Re-vois ce qui s'efface</span>
+      </div>
+    </button>
+    <button class="mode-btn mode-weak" data-mode="weak">
+      <div class="mode-icon">🎯</div>
+      <div class="mode-text">
+        <b>Mes Faiblesses</b>
+        <span id="weakBadge">Points à muscler</span>
+      </div>
+    </button>
+    <button class="mode-btn mode-duel" data-mode="duel">
+      <div class="mode-icon">⚔️</div>
+      <div class="mode-text">
+        <b>Duel à 2</b>
+        <span>Affronte un frère, une sœur, un copain !</span>
+      </div>
+    </button>
+    <button class="mode-btn mode-wrapped" data-mode="wrapped">
+      <div class="mode-icon">🎁</div>
+      <div class="mode-text">
+        <b>Mon Mois</b>
+        <span>Ton bilan à partager</span>
+      </div>
+    </button>
+  </div>
+
+  <h3 class="section-title">🗺️ Les Mondes</h3>
+  <div class="worlds-grid" id="worldsGrid"></div>
+</section>
+
+<!-- ============ ÉCRAN MONDE (sous-niveaux) ============ -->
+<section id="screen-world" class="screen">
+  <div class="bg-stars"></div>
+  <header class="topbar">
+    <button class="btn-back" data-target="screen-map">←</button>
+    <h2 id="worldTitle"></h2>
+  </header>
+
+  <div class="world-header">
+    <div class="world-emoji" id="worldEmoji"></div>
+    <p id="worldDescription"></p>
+  </div>
+
+  <button class="btn btn-secondary btn-lesson" id="btnLesson">📖 Voir la leçon</button>
+
+  <h3 class="section-title">Niveaux</h3>
+  <div class="stages-list" id="stagesList"></div>
+
+  <button class="btn btn-challenge" id="btnChallenge" style="display:none">⏱️ Challenge Chrono</button>
+  <button class="btn btn-boss" id="btnBoss">👑 Boss du Monde</button>
+</section>
+
+<!-- ============ ÉCRAN LEÇON ============ -->
+<section id="screen-lesson" class="screen">
+  <header class="topbar">
+    <button class="btn-back" data-target="screen-world">←</button>
+    <h2>📖 Leçon</h2>
+  </header>
+  <div class="lesson-content" id="lessonContent"></div>
+  <button class="btn btn-primary" id="btnLessonDone">J'ai compris, à moi !</button>
+</section>
+
+<!-- ============ ÉCRAN EXERCICE ============ -->
+<section id="screen-exercise" class="screen">
+  <header class="topbar exercise-topbar">
+    <button class="btn-back" id="btnQuitExercise">✕</button>
+    <div class="ex-progress">
+      <div class="ex-progress-bar"><div class="ex-progress-fill" id="exProgressFill"></div></div>
+      <div class="ex-counter" id="exCounter">1 / 10</div>
+    </div>
+    <div class="ex-stats">
+      <span class="ex-streak" id="exStreak">🔥 0</span>
+      <span class="ex-lives" id="exLives"></span>
+    </div>
+  </header>
+
+  <div class="ex-timer-wrap" id="exTimerWrap">
+    <div class="ex-timer-bar" id="exTimerBar"></div>
+  </div>
+
+  <div class="exercise-card" id="exerciseCard">
+    <div class="ex-trick" id="exTrick"></div>
+    <div class="ex-question" id="exQuestion"></div>
+
+    <div class="ex-answer-zone">
+      <input type="text" id="exAnswer" inputmode="decimal" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="?" enterkeyhint="send" readonly onfocus="this.removeAttribute('readonly')" />
+      <button class="btn btn-primary" id="btnSubmit">Valider</button>
+    </div>
+
+    <div class="ex-keypad" id="exKeypad">
+      <button data-key="1">1</button>
+      <button data-key="2">2</button>
+      <button data-key="3">3</button>
+      <button data-key="4">4</button>
+      <button data-key="5">5</button>
+      <button data-key="6">6</button>
+      <button data-key="7">7</button>
+      <button data-key="8">8</button>
+      <button data-key="9">9</button>
+      <button data-key="-">−</button>
+      <button data-key="0">0</button>
+      <button data-key=",">,</button>
+      <button class="key-back" data-key="back">⌫</button>
+    </div>
+  </div>
+
+  <!-- overlay feedback -->
+  <div class="feedback-overlay" id="feedback">
+    <div class="feedback-card" id="feedbackCard">
+      <div class="feedback-icon" id="feedbackIcon"></div>
+      <div class="feedback-title" id="feedbackTitle"></div>
+      <div class="feedback-equation" id="feedbackEq"></div>
+      <div class="feedback-explanation" id="feedbackExpl"></div>
+      <button class="btn btn-primary" id="btnNext">Suivant →</button>
+    </div>
+  </div>
+</section>
+
+<!-- ============ ÉCRAN RÉSULTATS ============ -->
+<section id="screen-results" class="screen">
+  <div class="bg-stars"></div>
+  <div class="results-card">
+    <div class="results-emoji" id="resultsEmoji">🎉</div>
+    <h2 id="resultsTitle">Bien joué !</h2>
+    <div class="results-stats">
+      <div class="stat"><b id="resScore">0</b><span>Score</span></div>
+      <div class="stat"><b id="resXP">+0</b><span>XP</span></div>
+      <div class="stat"><b id="resBest">0</b><span>Meilleur</span></div>
+    </div>
+    <div class="results-stars" id="resStars"></div>
+    <div class="results-badges" id="resBadges"></div>
+    <div class="results-actions">
+      <button class="btn btn-secondary" id="btnReplay">Rejouer</button>
+      <button class="btn btn-primary" id="btnReturn">Continuer</button>
+    </div>
+  </div>
+</section>
+
+<!-- ============ ÉCRAN TROPHÉES ============ -->
+<section id="screen-trophies" class="screen">
+  <header class="topbar">
+    <button class="btn-back" data-target="screen-map">←</button>
+    <h2>🏆 Trophées</h2>
+  </header>
+  <div class="trophy-grid" id="trophyGrid"></div>
+</section>
+
+<!-- ============ MODAL "À PROPOS" ============ -->
+<div class="modal" id="modalAbout">
+  <div class="modal-card">
+    <h2>Bienvenue dans Calastu !</h2>
+    <p>Calastu est un jeu pour devenir <b>champion du calcul mental</b>. On y apprend toutes les astuces des matheux : déplacer la virgule, décomposer, compenser, distribuer...</p>
+    <p>🎯 <b>9 mondes</b> à conquérir, chacun avec sa leçon, ses niveaux et son boss.</p>
+    <p>⚡ <b>Défi du jour</b> et <b>mode Survie</b> pour s'entraîner vite.</p>
+    <p>📖 À <b>chaque exercice</b> (juste OU faux), la <b>méthode est expliquée pas à pas</b>. C'est ça qui te fait progresser !</p>
+    <p>⏱️ Quand tu maîtrises un niveau (3★), le <b>Challenge Chrono</b> se débloque : combien de bonnes réponses en 60s ?</p>
+    <p>🏆 Gagne des XP, monte de niveau, débloque des trophées !</p>
+    <button class="btn btn-primary" id="btnAboutClose">C'est parti !</button>
+  </div>
+</div>
+
+<!-- ============ LEVEL UP OVERLAY ============ -->
+<div class="levelup-overlay" id="levelupOverlay">
+  <div class="levelup-card">
+    <div class="lu-label">Niveau</div>
+    <div class="lu-num" id="luNum">2</div>
+    <div class="lu-rank">
+      <span class="lu-rank-emoji" id="luRankEmoji">🌱</span>
+      <div id="luRankName">Apprenti</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL CONFIRM ============ -->
+<div class="modal" id="modalConfirm">
+  <div class="modal-card">
+    <h3 id="confirmTitle">Quitter ?</h3>
+    <p id="confirmText">Tu vas perdre ta progression dans ce niveau.</p>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="btnConfirmCancel">Non</button>
+      <button class="btn btn-danger" id="btnConfirmOk">Oui</button>
+    </div>
+  </div>
+</div>
+
+<!-- Overlay rotation paysage -->
+<div class="rotate-overlay" id="rotateOverlay">
+  <div class="rotate-icon">📱</div>
+  <h2>Tourne ton téléphone</h2>
+  <p>Calastu fonctionne mieux en mode <b>portrait</b>.</p>
+</div>
+
+<!-- Bandeau "nouvelle version disponible" -->
+<div class="update-banner" id="updateBanner">
+  <span>✨ Une nouvelle version est disponible !</span>
+  <button id="btnUpdate">Mettre à jour</button>
+</div>
+
+<script src="exercises.js"></script>
+<script src="app.js"></script>
+<script>
+// Service worker + détection de nouvelle version
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').then(reg => {
+      // Vérifie une mise à jour à chaque chargement
+      reg.update().catch(()=>{});
+      reg.addEventListener('updatefound', () => {
+        const nw = reg.installing;
+        if (!nw) return;
+        nw.addEventListener('statechange', () => {
+          if (nw.state === 'installed' && navigator.serviceWorker.controller) {
+            // Une nouvelle version attend
+            const banner = document.getElementById('updateBanner');
+            banner.classList.add('show');
+            document.getElementById('btnUpdate').onclick = () => {
+              nw.postMessage({ type: 'SKIP_WAITING' });
+              setTimeout(() => location.reload(), 200);
+            };
+          }
+        });
+      });
+    }).catch(()=>{});
+    // Si le contrôleur change, on recharge automatiquement
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (refreshing) return;
+      refreshing = true;
+      location.reload();
+    });
+  });
+}
+
+// Empêche le double-tap zoom sur les zones de jeu (iOS Safari)
+let lastTouch = 0;
+document.addEventListener('touchend', (e) => {
+  const now = Date.now();
+  if (now - lastTouch <= 350 && (e.target.closest('.ex-keypad') || e.target.closest('.btn') || e.target.closest('.mode-btn') || e.target.closest('button'))) {
+    e.preventDefault();
+  }
+  lastTouch = now;
+}, { passive: false });
+
+// Empêche le pinch-zoom (sécurité — déjà bloqué par viewport)
+document.addEventListener('gesturestart', (e) => e.preventDefault());
+
+// Détecte l'orientation paysage (smartphones uniquement, < 600px de largeur portrait)
+function checkOrientation() {
+  const isLandscape = window.innerWidth > window.innerHeight && window.innerHeight < 500;
+  document.getElementById('rotateOverlay').classList.toggle('show', isLandscape);
+}
+window.addEventListener('resize', checkOrientation);
+window.addEventListener('orientationchange', checkOrientation);
+checkOrientation();
+</script>
+</body>
+</html>
