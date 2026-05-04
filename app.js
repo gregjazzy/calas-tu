@@ -1243,6 +1243,7 @@ function nextQuestion() {
   s.currentEx = ex;
   s.count++;
   s.questionStartTime = Date.now();
+  s.firstKeyTime = null; // se remplit au 1er tap → mesure la réflexion pure
   // Démarre la barre "zone d'astuce" pour cet exo
   startTrickZone(ex.drillKey || s.drillKey);
 
@@ -1357,7 +1358,18 @@ function submitAnswer(timeout = false) {
     isGood = !timeout && answerEquals(userInput, ex.answer);
   }
 
-  const elapsed = (Date.now() - s.questionStartTime) / 1000;
+  // Le temps qui mesure l'ASTUCE = temps de réflexion (jusqu'au 1er tap)
+  // + un coût plat de saisie (0.5s pour valider).
+  // Si pas de 1er tap (l'enfant a tapé au clavier physique sans utiliser le keypad,
+  // ou réponse à 1 chiffre validée direct), on retombe sur le temps total.
+  const totalElapsed = (Date.now() - s.questionStartTime) / 1000;
+  let elapsed;
+  if (s.firstKeyTime) {
+    const reflectionTime = (s.firstKeyTime - s.questionStartTime) / 1000;
+    elapsed = reflectionTime + 0.5; // coût uniforme de saisie
+  } else {
+    elapsed = totalElapsed;
+  }
   stopTrickZone();
 
   // Évaluation 4 niveaux (justesse + vitesse)
@@ -1915,6 +1927,10 @@ document.addEventListener('DOMContentLoaded', () => {
   function fastKeyPress(b, inputId) {
     const inp = document.getElementById(inputId);
     if (!inp) return;
+    // Si c'est le 1er tap de la question : note le temps (réflexion pure)
+    if (state.session && state.session.firstKeyTime == null && inputId === 'exAnswer') {
+      state.session.firstKeyTime = Date.now();
+    }
     const k = b.dataset.key;
     // Mise à jour synchrone du texte — c'est tout ce qui doit se passer en priorité
     if (k === 'back') inp.value = inp.value.slice(0, -1);
