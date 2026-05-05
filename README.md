@@ -1,9 +1,13 @@
-# 🎯 Calastu — L'académie des as du calcul mental
+# 🎯 Calastu — Calcul mental gamifié
 
-Jeu mobile (PWA) pour devenir champion du calcul mental.
-**9 mondes**, **50+ astuces**, multi-profil, hors-ligne, sans Play Store.
+PWA mobile, 1 seule app, **2 modes** au choix au lancement :
 
-Pour CE2 → 4ème (et au-delà : c'est addictif aussi pour les grands 😄).
+- 🎒 **Junior** — 6 à 8 ans (GS, CP, CE1, CE2). Lecture vocale, clavier simplifié, exos adaptés (compter, additions, doubles, tables ×2/×5/×10...).
+- 🎓 **Pro** — 8 ans et plus (CE2 → 4ème). Astuces avancées (×0,1, ×11, carrés, fractions, distributivité, calculs longs).
+
+Multi-profil, hors-ligne, sans Play Store. Les profils sont **isolés par mode** : un même appareil peut avoir des profils Junior ET Pro indépendants.
+
+Bouton "Changer de mode" disponible dans l'espace parent.
 
 ---
 

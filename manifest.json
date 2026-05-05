@@ -1,7 +1,7 @@
 {
-  "name": "Calastu — As du Calcul",
+  "name": "Calastu — Calcul mental",
   "short_name": "Calastu",
-  "description": "L'académie des as du calcul mental. 9 mondes, 100+ astuces, multi-profil.",
+  "description": "Calcul mental gamifié. Mode Junior (6-8 ans) ou Pro (CE2 → 4ème). 9 mondes par mode, multi-profil, hors-ligne.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

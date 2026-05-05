@@ -10,7 +10,8 @@
 
 global.window = {};
 global.document = { addEventListener: () => {} };
-require('./exercises.js');
+const which = process.argv[2] || 'pro';
+require('./exercises-' + which + '.js');
 
 const W = window.WORLDS;
 

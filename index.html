@@ -15,8 +15,55 @@
 <link rel="apple-touch-icon" href="icon-192.png" />
 <title>Calastu — As du Calcul</title>
 <link rel="stylesheet" href="styles.css" />
+<script>
+  /* Mode loader : choisit Junior ou Pro avant tout chargement de l'app */
+  (function() {
+    var m = localStorage.getItem('calastu-mode');
+    if (m !== 'junior' && m !== 'pro') m = null;
+    window.CALASTU_MODE = m;
+    document.documentElement.setAttribute('data-mode', m || 'select');
+  })();
+</script>
 </head>
 <body>
+
+<!-- ============ ÉCRAN MODE SELECT (1er lancement) ============ -->
+<section id="screen-mode-select" class="screen">
+  <div class="bg-stars"></div>
+  <header class="hero">
+    <h1 class="logo">Cal<span>astu</span></h1>
+    <p class="tagline">Choisis ton aventure !</p>
+  </header>
+  <div class="mode-grid">
+    <button class="mode-card mode-card-junior" data-mode="junior">
+      <div class="mode-card-emoji">🎒</div>
+      <div class="mode-card-title">Calastu Junior</div>
+      <div class="mode-card-age">6 à 8 ans</div>
+      <div class="mode-card-classes">GS · CP · CE1 · CE2</div>
+      <ul class="mode-card-features">
+        <li>🔢 Compter, comparer</li>
+        <li>➕ Additions, soustractions</li>
+        <li>🤝 Amis de 10, doubles</li>
+        <li>🔟 Tables ×2, ×5, ×10</li>
+        <li>🔊 Voix qui lit les questions</li>
+      </ul>
+    </button>
+    <button class="mode-card mode-card-pro" data-mode="pro">
+      <div class="mode-card-emoji">🎓</div>
+      <div class="mode-card-title">Calastu Pro</div>
+      <div class="mode-card-age">8 ans et plus</div>
+      <div class="mode-card-classes">CE2 · CM1 · CM2 · 6ème → 4ème</div>
+      <ul class="mode-card-features">
+        <li>🌍 Virgule, ×0,1, ÷0,1</li>
+        <li>💎 ×9, ×11, ×25, carrés</li>
+        <li>🌟 Compensation, distributivité</li>
+        <li>🍕 Fractions, pourcentages</li>
+        <li>🧠 Calculs longs multi-étapes</li>
+      </ul>
+    </button>
+  </div>
+  <p class="mode-foot">Tu pourras changer plus tard dans l'espace parent.</p>
+</section>
 
 <!-- ============ ÉCRAN PROFILS ============ -->
 <section id="screen-profiles" class="screen active">
@@ -108,7 +155,7 @@
         <button data-key="1">1</button><button data-key="2">2</button><button data-key="3">3</button>
         <button data-key="4">4</button><button data-key="5">5</button><button data-key="6">6</button>
         <button data-key="7">7</button><button data-key="8">8</button><button data-key="9">9</button>
-        <button data-key="-">−</button><button data-key="0">0</button><button data-key=",">,</button>
+        <button data-key="-" class="pro-only">−</button><button data-key="0">0</button><button data-key="," class="pro-only">,</button>
         <button class="key-back" data-key="back">⌫</button>
       </div>
     </div>
@@ -266,7 +313,7 @@
         <button data-key="1">1</button><button data-key="2">2</button><button data-key="3">3</button>
         <button data-key="4">4</button><button data-key="5">5</button><button data-key="6">6</button>
         <button data-key="7">7</button><button data-key="8">8</button><button data-key="9">9</button>
-        <button data-key="-">−</button><button data-key="0">0</button><button data-key=",">,</button>
+        <button data-key="-" class="pro-only">−</button><button data-key="0">0</button><button data-key="," class="pro-only">,</button>
         <button class="key-back" data-key="back">⌫</button>
       </div>
     </div>
@@ -290,6 +337,7 @@
         </div>
       </div>
     </div>
+    <button class="btn-icon junior-only" id="btnVoice" title="Voix : on/off">🔊</button>
     <button class="btn-icon" id="btnFullscreen" title="Plein écran">🔳</button>
     <button class="btn-icon" id="btnShop" title="Boutique">🛍️</button>
     <button class="btn-icon" id="btnExport" title="Sauvegarder">💾</button>
@@ -432,6 +480,7 @@
       <div class="ex-progress-bar"><div class="ex-progress-fill" id="exProgressFill"></div></div>
       <div class="ex-counter" id="exCounter">1 / 10</div>
     </div>
+    <button class="btn-icon btn-icon-voice junior-only" id="btnVoiceEx" title="Réécouter">🔊</button>
     <div class="ex-stats">
       <span class="ex-streak" id="exStreak">🔥 0</span>
       <span class="ex-lives" id="exLives"></span>
@@ -468,10 +517,10 @@
       <button data-key="7">7</button>
       <button data-key="8">8</button>
       <button data-key="9">9</button>
-      <button data-key="-">−</button>
+      <button data-key="-" class="pro-only">−</button>
       <button data-key="0">0</button>
-      <button data-key=",">,</button>
-      <button data-key="/" id="exKeyFrac" style="display:none">⁄</button>
+      <button data-key="," class="pro-only">,</button>
+      <button data-key="/" id="exKeyFrac" class="pro-only" style="display:none">⁄</button>
       <button class="key-back" data-key="back">⌫</button>
     </div>
   </div>
@@ -572,7 +621,10 @@
 <!-- Indicateur hors ligne -->
 <div class="offline-indicator" id="offlineIndicator">📵 Hors ligne — la progression est sauvée localement</div>
 
-<script src="exercises.js"></script>
+<script>
+  /* Charge le bon jeu d'exercices selon le mode (junior/pro/null = pro par défaut) */
+  document.write('<scr' + 'ipt src="exercises-' + (window.CALASTU_MODE === 'junior' ? 'junior' : 'pro') + '.js"></scr' + 'ipt>');
+</script>
 <script src="app.js"></script>
 <script>
 // Service worker + détection de nouvelle version

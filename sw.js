@@ -1,5 +1,5 @@
 /* Calastu — Service Worker (offline-first) */
-const CACHE = 'calastu-v13';
+const CACHE = 'calastu-v14';
 
 self.addEventListener('message', (e) => {
   if (e.data && e.data.type === 'SKIP_WAITING') self.skipWaiting();
@@ -10,7 +10,8 @@ const ASSETS = [
   './index.html',
   './styles.css',
   './app.js',
-  './exercises.js',
+  './exercises-pro.js',
+  './exercises-junior.js',
   './manifest.json',
   './icon.svg',
   './icon-192.png',

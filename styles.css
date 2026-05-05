@@ -2066,3 +2066,84 @@ input { font-family: inherit; }
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ============================================================
+   MODE SELECT — écran de choix Junior / Pro (1er lancement)
+   ============================================================ */
+.mode-grid {
+  display: grid;
+  gap: 16px;
+  padding: 0 8px;
+}
+.mode-card {
+  display: block;
+  width: 100%;
+  background: var(--card-strong);
+  border: 2px solid var(--border);
+  border-radius: 18px;
+  padding: 18px 16px;
+  text-align: left;
+  color: var(--text);
+  cursor: pointer;
+  transition: transform 0.15s ease-out, border-color 0.15s;
+}
+.mode-card:active { transform: scale(0.97); }
+.mode-card-junior {
+  background: linear-gradient(135deg, rgba(6,214,160,0.18), rgba(76,201,240,0.10));
+  border-color: rgba(6,214,160,0.5);
+}
+.mode-card-pro {
+  background: linear-gradient(135deg, rgba(247,37,133,0.16), rgba(114,9,183,0.10));
+  border-color: rgba(247,37,133,0.5);
+}
+.mode-card-emoji { font-size: 44px; line-height: 1; margin-bottom: 6px; }
+.mode-card-title { font-size: 22px; font-weight: 800; margin-bottom: 2px; }
+.mode-card-age { font-size: 14px; color: var(--accent); font-weight: 700; margin-bottom: 4px; }
+.mode-card-classes { font-size: 12px; color: var(--text-soft); margin-bottom: 10px; }
+.mode-card-features { list-style: none; padding: 0; margin: 0; font-size: 13px; line-height: 1.7; }
+.mode-card-features li { padding-left: 4px; }
+.mode-foot { font-size: 12px; color: var(--text-soft); text-align: center; margin-top: 18px; padding: 0 16px; }
+
+/* ============================================================
+   MODE-AWARE : visibilité conditionnelle selon Junior/Pro
+   ============================================================ */
+html[data-mode="pro"] .junior-only { display: none !important; }
+html[data-mode="junior"] .pro-only { display: none !important; }
+html[data-mode="select"] .junior-only,
+html[data-mode="select"] .pro-only { display: none !important; }
+
+/* Junior : clavier sans virgule/moins → 0 prend 2 cases */
+html[data-mode="junior"] .ex-keypad button[data-key="0"] {
+  grid-column: span 2;
+}
+
+/* Junior : gros emojis pour les questions de comptage */
+.big-emoji {
+  display: block;
+  font-size: 38px;
+  line-height: 1.4;
+  letter-spacing: 4px;
+  margin-top: 14px;
+  word-break: break-word;
+}
+.ex-question { word-break: break-word; }
+
+/* Junior : question cliquable pour réécouter */
+html[data-mode="junior"] .ex-question {
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+}
+html[data-mode="junior"] .ex-question:active { transform: scale(0.98); }
+
+/* Bouton voix */
+.btn-icon-voice {
+  margin-left: auto;
+  margin-right: 6px;
+}
+.btn-icon.voice-off { opacity: 0.5; }
+.exercise-topbar .btn-icon-voice {
+  font-size: 22px;
+  background: rgba(76, 201, 240, 0.15);
+  border: 1px solid rgba(76, 201, 240, 0.4);
+}

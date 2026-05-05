@@ -1,8 +1,116 @@
 /* ============================================================
    CALASTU — Logique de jeu, navigation, état, persistance
+   App unifiée Junior (6-8 ans) + Pro (CE2 → 4ème).
    ============================================================ */
 
-const STORAGE_KEY = 'calastu_v1';
+/* Mode = 'junior' | 'pro'. Lu depuis localStorage par le loader inline.
+   Si null, on affiche l'écran de sélection avant le reste. */
+const MODE = window.CALASTU_MODE || null;
+const IS_JUNIOR = MODE === 'junior';
+
+/* Clé de stockage isolée par mode → un même appareil peut faire les 2 sans collision */
+const STORAGE_KEY = IS_JUNIOR ? 'calastu_junior_v1' : 'calastu_v1';
+
+function setMode(m) {
+  if (m !== 'junior' && m !== 'pro') return;
+  localStorage.setItem('calastu-mode', m);
+  location.reload();
+}
+function clearMode() {
+  localStorage.removeItem('calastu-mode');
+  location.reload();
+}
+
+/* ============================================================
+   TTS — Lecture vocale (Junior uniquement par défaut)
+   ============================================================ */
+const VOICE_KEY = 'calastu-voice';
+function voiceOn() {
+  const v = localStorage.getItem(VOICE_KEY);
+  if (v === '1') return true;
+  if (v === '0') return false;
+  return IS_JUNIOR; // par défaut : on en Junior, off en Pro
+}
+function setVoiceOn(b) { localStorage.setItem(VOICE_KEY, b ? '1' : '0'); }
+
+let _frVoice = null;
+function pickFrenchVoice() {
+  if (!('speechSynthesis' in window)) return null;
+  const voices = window.speechSynthesis.getVoices();
+  if (!voices || !voices.length) return null;
+  return voices.find(v => v.lang && v.lang.startsWith('fr') && v.localService)
+      || voices.find(v => v.lang && v.lang.startsWith('fr'))
+      || null;
+}
+if ('speechSynthesis' in window) {
+  _frVoice = pickFrenchVoice();
+  window.speechSynthesis.onvoiceschanged = () => { _frVoice = pickFrenchVoice(); };
+}
+function speak(text) {
+  if (!voiceOn()) return;
+  if (!('speechSynthesis' in window)) return;
+  try {
+    window.speechSynthesis.cancel();
+    const clean = String(text || '')
+      .replace(/<br\s*\/?>/gi, '. ')
+      .replace(/<[^>]*>/g, ' ')
+      .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{1F000}-\u{1F2FF}]/gu, '')
+      .replace(/×/g, ' fois ')
+      .replace(/÷/g, ' divisé par ')
+      .replace(/\+/g, ' plus ')
+      .replace(/−/g, ' moins ')
+      .replace(/=/g, ' égal ')
+      .replace(/\?/g, ' combien')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (!clean) return;
+    const u = new SpeechSynthesisUtterance(clean);
+    u.lang = 'fr-FR';
+    u.rate = 0.92;
+    u.pitch = 1.05;
+    if (!_frVoice) _frVoice = pickFrenchVoice();
+    if (_frVoice) u.voice = _frVoice;
+    window.speechSynthesis.speak(u);
+  } catch (e) {}
+}
+function stopSpeak() {
+  if ('speechSynthesis' in window) try { window.speechSynthesis.cancel(); } catch(e) {}
+}
+
+/* Branding mode-aware : ajuste titre, tagline, theme color, modal "À propos" */
+function applyModeBranding() {
+  const isJ = IS_JUNIOR;
+  // Logo + tagline
+  const logo = document.querySelector('#screen-profiles .logo');
+  if (logo) logo.innerHTML = isJ ? 'Cal<span>astu</span> Junior' : 'Cal<span>astu</span>';
+  const tag = document.querySelector('#screen-profiles .tagline');
+  if (tag) tag.textContent = isJ
+    ? 'Mon premier calcul mental — dès 6 ans'
+    : 'L\'académie des as du calcul mental';
+  // Title onglet
+  document.title = isJ
+    ? 'Calastu Junior — Mon premier calcul mental'
+    : 'Calastu — As du Calcul';
+  // Theme color (couleur de la barre PWA)
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', isJ ? '#06d6a0' : '#1a0b3d');
+  // À-propos
+  const modal = document.querySelector('#modalAbout .modal-card');
+  if (modal && isJ) {
+    modal.innerHTML = `
+      <h2>Bienvenue dans Calastu Junior !</h2>
+      <p>Un jeu pour <b>apprendre à calculer</b> en s'amusant, dès 6 ans !</p>
+      <p>🎯 <b>9 mondes</b> : nombres, additions, soustractions, doubles, tables...</p>
+      <p>🔊 <b>Une voix</b> lit chaque question — pratique si on lit pas vite !</p>
+      <p>📖 À chaque exercice, on t'explique <b>l'astuce pas à pas</b>.</p>
+      <p>🏆 Gagne des XP, monte de niveau, gagne des trophées !</p>
+      <button class="btn btn-primary" id="btnAboutClose">C'est parti !</button>
+    `;
+    document.getElementById('btnAboutClose').addEventListener('click', () => {
+      document.getElementById('modalAbout').classList.remove('show');
+    });
+  }
+}
 
 /* ---------- État global ---------- */
 const state = {
@@ -713,7 +821,7 @@ function escapeHTML(s) {
 /* ============================================================
    ÉCRAN CRÉATION PROFIL
    ============================================================ */
-let _newProfileTmp = { avatar: AVATARS[0], classe: 'CM1' };
+let _newProfileTmp = { avatar: AVATARS[0], classe: IS_JUNIOR ? 'CP' : 'CM1' };
 
 function renderNewProfile() {
   const av = document.getElementById('avatarPicker');
@@ -729,14 +837,26 @@ function renderNewProfile() {
     });
     av.appendChild(b);
   });
-  document.querySelectorAll('#classPicker button').forEach(btn => {
-    btn.classList.toggle('sel', btn.dataset.class === _newProfileTmp.classe);
-    btn.onclick = () => {
-      _newProfileTmp.classe = btn.dataset.class;
-      document.querySelectorAll('#classPicker button').forEach(x => x.classList.remove('sel'));
-      btn.classList.add('sel');
-    };
-  });
+  // Renseigne dynamiquement les classes selon le mode
+  const cp = document.getElementById('classPicker');
+  if (cp) {
+    const classes = IS_JUNIOR
+      ? [{k:'GS',l:'Grande Section'},{k:'CP',l:'CP'},{k:'CE1',l:'CE1'},{k:'CE2',l:'CE2'}]
+      : [{k:'CE2',l:'CE2'},{k:'CM1',l:'CM1'},{k:'CM2',l:'CM2'},{k:'6e',l:'6ème'},{k:'5e',l:'5ème'},{k:'4e',l:'4ème'}];
+    cp.innerHTML = '';
+    classes.forEach(c => {
+      const b = document.createElement('button');
+      b.dataset.class = c.k;
+      b.textContent = c.l;
+      if (c.k === _newProfileTmp.classe) b.classList.add('sel');
+      b.onclick = () => {
+        _newProfileTmp.classe = c.k;
+        cp.querySelectorAll('button').forEach(x => x.classList.remove('sel'));
+        b.classList.add('sel');
+      };
+      cp.appendChild(b);
+    });
+  }
   document.getElementById('newName').value = '';
 }
 
@@ -1257,6 +1377,7 @@ function nextQuestion() {
   const trickText = ex.isReview ? `🔁 RÉVISION · ${ex.trick}` : (s.mode === 'boss' && s.bossPhase === 2 ? `👑 PHASE 2 · ${ex.trick}` : ex.trick);
   document.getElementById('exTrick').textContent = trickText;
   document.getElementById('exQuestion').innerHTML = formatQuestion(ex.question);
+  speak(ex.question);
   // Touche "/" pour les fractions
   const fracKey = document.getElementById('exKeyFrac');
   if (fracKey) fracKey.style.display = ex.isFraction ? '' : 'none';
@@ -1616,6 +1737,7 @@ function retryCurrentQuestion() {
   // UI : on rebascule sur l'écran d'exercice (déjà dessus normalement)
   document.getElementById('exTrick').textContent = '🔁 Reprenons : applique la méthode';
   document.getElementById('exQuestion').innerHTML = formatQuestion(ex.question);
+  speak(ex.question);
   document.getElementById('exAnswer').value = '';
   // Reset compteur visuel timing pour ce retry
   s.questionStartTime = Date.now();
@@ -1871,13 +1993,21 @@ function showTrophies() {
 document.addEventListener('DOMContentLoaded', () => {
   loadData();
   renderProfiles();
-  showScreen('screen-profiles');
 
-  // First visit ?
-  if (!localStorage.getItem('calastu_seen')) {
-    document.getElementById('modalAbout').classList.add('show');
-    localStorage.setItem('calastu_seen', '1');
+  // Si aucun mode choisi → écran de sélection AVANT tout le reste
+  if (!MODE) {
+    showScreen('screen-mode-select');
+  } else {
+    showScreen('screen-profiles');
+    // First visit ?
+    if (!localStorage.getItem('calastu_seen')) {
+      document.getElementById('modalAbout').classList.add('show');
+      localStorage.setItem('calastu_seen', '1');
+    }
   }
+
+  // Adapte le branding et le clavier au mode courant
+  applyModeBranding();
 
   // Boutons globaux back
   document.querySelectorAll('.btn-back[data-target]').forEach(b => {
@@ -1885,7 +2015,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   document.getElementById('btnNewProfile').addEventListener('click', () => {
-    _newProfileTmp = { avatar: AVATARS[0], classe: 'CM1' };
+    _newProfileTmp = { avatar: AVATARS[0], classe: IS_JUNIOR ? 'CP' : 'CM1' };
     renderNewProfile();
     showScreen('screen-newprofile');
   });
@@ -1981,6 +2111,53 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Plein écran (force le mode immersif via Fullscreen API)
   document.getElementById('btnFullscreen').addEventListener('click', toggleFullscreen);
+
+  // ===== Voix TTS (Junior) =====
+  function syncVoiceButtons() {
+    const on = voiceOn();
+    document.querySelectorAll('#btnVoice, #btnVoiceEx').forEach(b => {
+      if (b) {
+        b.textContent = on ? '🔊' : '🔇';
+        b.classList.toggle('voice-off', !on);
+      }
+    });
+  }
+  const btnVoice = document.getElementById('btnVoice');
+  if (btnVoice) {
+    btnVoice.addEventListener('click', () => {
+      setVoiceOn(!voiceOn());
+      syncVoiceButtons();
+      if (voiceOn()) speak('La voix est activée'); else stopSpeak();
+    });
+  }
+  const btnVoiceEx = document.getElementById('btnVoiceEx');
+  if (btnVoiceEx) {
+    btnVoiceEx.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (!voiceOn()) { setVoiceOn(true); syncVoiceButtons(); }
+      const ex = state.session && state.session.currentEx;
+      if (ex) speak(ex.question);
+    });
+  }
+  const exQ = document.getElementById('exQuestion');
+  if (exQ) exQ.addEventListener('click', () => {
+    if (!IS_JUNIOR) return;
+    const ex = state.session && state.session.currentEx;
+    if (ex) speak(ex.question);
+  });
+  const placQ = document.getElementById('placementQuestion');
+  if (placQ) placQ.addEventListener('click', () => {
+    if (!IS_JUNIOR) return;
+    const q = placement.questions[placement.index];
+    if (q && q.ex) speak(q.ex.question);
+  });
+  syncVoiceButtons();
+
+  // ===== Écran mode-select : 1er lancement =====
+  const modeButtons = document.querySelectorAll('#screen-mode-select [data-mode]');
+  modeButtons.forEach(b => {
+    b.addEventListener('click', () => setMode(b.dataset.mode));
+  });
 
   // Export / Import
   document.getElementById('btnExport').addEventListener('click', () => {
@@ -2253,6 +2430,7 @@ function placementNext() {
   const q = placement.questions[placement.index];
   document.getElementById('placementTrick').textContent = q.ex.trick;
   document.getElementById('placementQuestion').innerHTML = formatQuestion(q.ex.question);
+  speak(q.ex.question);
   document.getElementById('placementAnswer').value = '';
   document.getElementById('placementCounter').textContent = `${placement.index + 1} / ${placement.questions.length}`;
   document.getElementById('placementProgressFill').style.width = (placement.index / placement.questions.length * 100) + '%';
@@ -2481,6 +2659,7 @@ function duelNext() {
 
   document.getElementById('duelTrick').textContent = ex.trick;
   document.getElementById('duelQuestion').innerHTML = formatQuestion(ex.question);
+  speak(ex.question);
   document.getElementById('duelAnswer').value = '';
   document.getElementById('duelProgress').textContent = `Manche ${duel.round} / ${duel.rounds}`;
   document.getElementById('duelScore1').textContent = duel.scores[0];
@@ -2709,9 +2888,13 @@ function showParentDashboard() {
   }
 
   // Section paramètres
+  const modeLabel = IS_JUNIOR ? '🎒 Junior (6-8 ans)' : '🎓 Pro (CE2 → 4ème)';
   html += `<div class="parent-section">
     <h3>⚙️ Paramètres</h3>
-    <button class="btn btn-secondary" id="btnNotifEnable">🔔 Activer les rappels quotidiens</button>
+    <p style="font-size:13px;color:var(--text-soft);margin-bottom:8px">Mode actuel : <b>${modeLabel}</b></p>
+    <button class="btn btn-secondary" id="btnSwitchMode">🔄 Changer de mode</button>
+    <p style="font-size:11px;color:var(--text-soft);margin-top:6px">Les profils du mode actuel restent sauvegardés.</p>
+    <button class="btn btn-secondary" id="btnNotifEnable" style="margin-top:14px">🔔 Activer les rappels quotidiens</button>
     <p id="notifStatus" style="font-size:11px;color:var(--text-soft);margin-top:6px"></p>
     <button class="btn btn-secondary" id="btnChangePin" style="margin-top:10px">🔐 Changer le code PIN</button>
   </div>`;
@@ -2726,6 +2909,11 @@ function showParentDashboard() {
     saveData();
     flash('PIN réinitialisé. Crée-en un nouveau.');
     openParentMode();
+  };
+  document.getElementById('btnSwitchMode').onclick = () => {
+    if (confirm('Revenir à l\'écran de choix Junior / Pro ?\nTes profils actuels restent sauvegardés.')) {
+      clearMode();
+    }
   };
   updateNotifStatus();
 }
@@ -2823,6 +3011,7 @@ function buyShopItem(profile, item) {
   profile.shopEquipped = profile.shopEquipped || {};
   profile.shopEquipped[item.type] = item.id;
   saveData();
+  refreshLiveAvatar(profile);
   return true;
 }
 
@@ -2837,7 +3026,19 @@ function equipShopItem(profile, item) {
   // Si c'est un thème, applique-le immédiatement
   if (item.type === 'theme') applyTheme(profile);
   saveData();
+  refreshLiveAvatar(profile);
   return true;
+}
+
+/* Rafraîchit en live l'avatar du profil courant partout où il est affiché.
+   Appelé après équipement/achat dans la boutique. */
+function refreshLiveAvatar(profile) {
+  if (!profile) return;
+  // Topbar de la carte
+  const playerAv = document.getElementById('playerAvatar');
+  if (playerAv) playerAv.innerHTML = avatarHTML(profile);
+  // Re-render la liste des profils (au cas où on revient à l'accueil)
+  if (typeof renderProfiles === 'function') renderProfiles();
 }
 
 function applyTheme(profile) {
